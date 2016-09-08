@@ -86,7 +86,7 @@ class RpcApi:
         except:
             raise
 
-    def get_rpc_id(self):
+    def get_request_id(self):
         if RpcApi.RPC_ID == 0:  #Startup
             RpcApi.RPC_ID = 1
             if (not self.device_info and
@@ -97,11 +97,10 @@ class RpcApi:
         else:
             rand = random.randint(0, 2**31)
         RpcApi.RPC_ID += 1
-        cnt = RpcApi.RPC_ID
-        reqid = ((rand| ((cnt&0xFFFFFFFF)>>31))<<32)|cnt
-        self.log.debug("Incremented RPC Request ID: %s", reqid)
+        request_id = ((rand | ((RpcApi.RPC_ID & 0xFFFFFFFF) >> 31)) << 32) | RpcApi.RPC_ID
+        self.log.debug("Incremented RPC Request ID: %s", request_id)
 
-        return RpcApi.RPC_ID
+        return request_id
 
     def decode_raw(self, raw):
         output = error = None
@@ -183,7 +182,7 @@ class RpcApi:
 
         request = RequestEnvelope()
         request.status_code = 2
-        request.request_id = self.get_rpc_id()
+        request.request_id = self.get_request_id()
         request.accuracy = random.choice((5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66,80)))
 
         if player_position:
