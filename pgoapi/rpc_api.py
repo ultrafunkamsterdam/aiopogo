@@ -226,7 +226,7 @@ class RpcApi:
             sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
             loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
 
-            loc.name = random.choice(('network', 'network', 'network', 'network', 'fused'))
+            loc.name = 'fused'
             loc.latitude = request.latitude
             loc.longitude = request.longitude
 
