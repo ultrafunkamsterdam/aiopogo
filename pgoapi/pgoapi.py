@@ -173,7 +173,7 @@ class PGoApi:
             self._position_alt = alt
 
         try:
-            self.set_authentication(provider, username=username, password=password)
+            self.set_authentication(provider, username=username, password=password, proxy_config=self._session.proxies)
         except AuthException as e:
             self.log.error('Login process failed: %s', e)
             return False
