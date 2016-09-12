@@ -183,7 +183,7 @@ class RpcApi:
         request = RequestEnvelope()
         request.status_code = 2
         request.request_id = self.get_request_id()
-        request.accuracy = random.choice((5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66,80)))
+        request.accuracy = random.choice((5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66,80)))
 
         if player_position:
             request.latitude, request.longitude, altitude = player_position
@@ -253,25 +253,25 @@ class RpcApi:
                 if request.accuracy > 10:
                     loc.vertical_accuracy = random.choice((24, 32, 48, 48, 64, 64, 96, 128))
                 else:
-                    loc.vertical_accuracy = random.choice((3, 4, 6, 6, 8, 12, 24))
+                    loc.vertical_accuracy = random.choice((3, 4, 6, 6, 6, 6, 8, 12, 24))
                 loc.horizontal_accuracy = request.accuracy
 
-            sen.acceleration_x = random.triangular(-3, 1, 0)
-            sen.acceleration_y = random.triangular(-2, 3, 0)
-            sen.acceleration_z = random.triangular(-4, 2, 0)
-            sen.magnetic_field_x = random.triangular(-50, 50, 0)
-            sen.magnetic_field_y = random.triangular(-60, 50, -5)
-            sen.magnetic_field_z = random.triangular(-60, 40, -30)
-            sen.magnetic_field_accuracy = random.choice((-1, 1, 1, 2, 2, 2, 2))
-            sen.attitude_pitch = random.triangular(-1.5, 1.5, 0.2)
-            sen.attitude_yaw = random.uniform(-3, 3)
-            sen.attitude_roll = random.triangular(-2.8, 2.5, 0.25)
-            sen.rotation_rate_x = random.triangular(-6, 4, 0)
-            sen.rotation_rate_y = random.triangular(-5.5, 5, 0)
-            sen.rotation_rate_z = random.triangular(-5, 3, 0)
-            sen.gravity_x = random.triangular(-1, 1, 0.15)
+            sen.acceleration_x = random.triangular(-1.7, 1.2, 0)
+            sen.acceleration_y = random.triangular(-1.4, 1.9, 0)
+            sen.acceleration_z = random.triangular(-1.4, .9, 0)
+            sen.magnetic_field_x = random.triangular(-54, 50, 0)
+            sen.magnetic_field_y = random.triangular(-51, 57, -4.8)
+            sen.magnetic_field_z = random.triangular(-56, 43, -30)
+            sen.magnetic_field_accuracy = random.choice((-1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2))
+            sen.attitude_pitch = random.triangular(-1.5, 1.5, 0.4)
+            sen.attitude_yaw = random.triangular(-3.1, 3.1, .198)
+            sen.attitude_roll = random.triangular(-2.8, 3.04, 0)
+            sen.rotation_rate_x = random.triangular(-4.7, 3.9, 0)
+            sen.rotation_rate_y = random.triangular(-4.7, 4.3, 0)
+            sen.rotation_rate_z = random.triangular(-4.7, 6.5, 0)
+            sen.gravity_x = random.triangular(-1, 1, 0)
             sen.gravity_y = random.triangular(-1, 1, -.2)
-            sen.gravity_z = random.triangular(-1, .7, -0.8)
+            sen.gravity_z = random.triangular(-1, .7, -0.7)
             sen.status = 3
 
             sig.field25 = 7363665268261373700
