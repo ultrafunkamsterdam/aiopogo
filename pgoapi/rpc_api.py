@@ -89,7 +89,7 @@ class RpcApi:
     def get_request_id(self):
         if RpcApi.RPC_ID == 0:  #Startup
             RpcApi.RPC_ID = 1
-            if (not self.device_info and
+            if (self.device_info and
                     self.device_info.get('device_brand','Apple') != 'Apple'):
                 rand = 0x53B77E48
             else:
