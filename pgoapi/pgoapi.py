@@ -136,6 +136,18 @@ class PGoApi:
         def function(**kwargs):
             request = self.create_request()
             getattr(request, func)(_call_direct=True, **kwargs )
+            if (func != 'verify_challenge' and
+                    func != 'check_challenge' and
+                    func != 'get_hatched_eggs' and
+                    func != 'check_awarded_badges' and
+                    func != 'download_settings' and
+                    func != 'get_buddy_walked'):
+                request.check_challenge()
+                request.get_hatched_eggs()
+                request.get_inventory()
+                request.check_awarded_badges()
+                request.download_settings(hash="54b359c97e46900f87211ef6e6dd0b7f2a3ea1f5")
+                request.get_buddy_walked()
             return request.call()
 
         if func.upper() in RequestType.keys():
@@ -150,6 +162,7 @@ class PGoApi:
         request = self.create_request()
 
         request.get_player()
+        request.check_challenge()
         request.get_hatched_eggs()
         request.get_inventory()
         request.check_awarded_badges()
@@ -188,6 +201,11 @@ class PGoApi:
         if not response:
             self.log.info('Login failed!')
             return False
+
+        challenge_url = response.get('responses', {}).get('CHECK_CHALLENGE', {}).get('challenge_url', ' ')
+        if challenge_url != ' ':
+            self.log.error('CAPCHA required: ' + challenge_url)
+            return challenge_url
 
         self.log.info('Login process completed')
 
