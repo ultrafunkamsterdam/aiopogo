@@ -26,6 +26,9 @@ Author: tjado <https://github.com/tejado>
 class AuthException(Exception):
     pass
 
+class BannedAccount(Exception):
+    """Raised when account is banned"""
+
 class NotLoggedInException(Exception):
     pass
 
@@ -40,7 +43,7 @@ class NoPlayerPositionSetException(Exception):
     
 class EmptySubrequestChainException(Exception):
     pass
-    
+
 class ServerSideRequestThrottlingException(Exception):
     pass
 

@@ -36,7 +36,7 @@ from pgoapi.rpc_api import RpcApi
 from pgoapi.auth_ptc import AuthPtc
 from pgoapi.auth_google import AuthGoogle
 from pgoapi.utilities import parse_api_endpoint, get_lib_paths
-from pgoapi.exceptions import AuthException, NotLoggedInException, ServerBusyOrOfflineException, NoPlayerPositionSetException, EmptySubrequestChainException, AuthTokenExpiredException, ServerApiEndpointRedirectException, UnexpectedResponseException
+from pgoapi.exceptions import AuthException, BannedAccount, NotLoggedInException, ServerBusyOrOfflineException, NoPlayerPositionSetException, EmptySubrequestChainException, AuthTokenExpiredException, ServerApiEndpointRedirectException, UnexpectedResponseException
 
 from . import protos
 from pogoprotos.networking.requests.request_type_pb2 import RequestType
@@ -148,18 +148,6 @@ class PGoApi:
         def function(**kwargs):
             request = self.create_request()
             getattr(request, func)(_call_direct=True, **kwargs )
-            if (func != 'verify_challenge' and
-                    func != 'check_challenge' and
-                    func != 'get_hatched_eggs' and
-                    func != 'check_awarded_badges' and
-                    func != 'download_settings' and
-                    func != 'get_buddy_walked'):
-                request.check_challenge()
-                request.get_hatched_eggs()
-                request.get_inventory()
-                request.check_awarded_badges()
-                request.download_settings(hash="54b359c97e46900f87211ef6e6dd0b7f2a3ea1f5")
-                request.get_buddy_walked()
             return request.call()
 
         if func.upper() in RequestType.keys():
@@ -178,16 +166,16 @@ class PGoApi:
         
         # Send GET_PLAYER only
         request = self.create_request()
-        request.get_player(player_locale = {'country': 'US', 'language': 'en', 'timezone': 'America/Chicago'})
+        request.get_player()
         response = request.call()
         
-        if response['responses']['GET_PLAYER']['banned'] == True:
-            raise AuthException("Account is banned")
+        if response.get('responses', {}).get('GET_PLAYER', {}).get('banned', False):
+            raise BannedAccount()
         
         time.sleep(1.5)
 
         request = self.create_request()
-        request.download_remote_config_version(platform = 1, app_version = 4500)
+        request.download_remote_config_version()
         request.check_challenge()
         request.get_hatched_eggs()
         request.get_inventory()
