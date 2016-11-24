@@ -42,14 +42,13 @@ from importlib import import_module
 
 from pgoapi.protobuf_to_dict import protobuf_to_dict
 from pgoapi.exceptions import NotLoggedInException, ServerBusyOrOfflineException, ServerSideRequestThrottlingException, ServerSideAccessForbiddenException, UnexpectedResponseException, AuthTokenExpiredException, ServerApiEndpointRedirectException
-from pgoapi.utilities import to_camel_case, get_time, get_format_time_diff, Rand48, long_to_bytes, f2i, \
-    HashGenerator
+from pgoapi.utilities import to_camel_case, get_time, get_format_time_diff, HashGenerator
 
 from . import protos
 from pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope
 from pogoprotos.networking.envelopes.response_envelope_pb2 import ResponseEnvelope
 from pogoprotos.networking.requests.request_type_pb2 import RequestType
-from pogoprotos.networking.envelopes.signature_pb2 import Signature
+from pogoprotos.networking.envelopes.signal_log_pb2 import SignalLog
 from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
 
 
@@ -91,7 +90,7 @@ class RpcApi:
         if RpcApi.RPC_ID == 0:  #Startup
             RpcApi.RPC_ID = 1
             if (self.device_info and
-                    self.device_info.get('device_brand','Apple') != 'Apple'):
+                    self.device_info.get('brand','Apple') != 'Apple'):
                 rand = 0x53B77E48
             else:
                 rand = 0x000041A7
@@ -206,28 +205,28 @@ class RpcApi:
             ticket_serialized = request.auth_info.SerializeToString()  #Sig uses this when no auth_ticket available
 
         if self._signature_gen:
-            sig = Signature()
+            sig = SignalLog()
 
-            sig.location_hash1 = self._hash_engine.generate_location_hash_by_seed(ticket_serialized, request.latitude, request.longitude, request.accuracy)
-            sig.location_hash2 = self._hash_engine.generate_location_hash(request.latitude, request.longitude, request.accuracy)
+            sig.location_hash_by_token_seed = self._hash_engine.generate_location_hash_by_seed(ticket_serialized, request.latitude, request.longitude, request.accuracy)
+            sig.location_hash = self._hash_engine.generate_location_hash(request.latitude, request.longitude, request.accuracy)
 
             for req in request.requests:
                 hash = self._hash_engine.generate_request_hash(ticket_serialized, req.SerializeToString())
-                sig.request_hash.append(hash)
+                sig.request_hashes.append(hash)
 
-            sig.session_hash = self.session_hash
-            sig.timestamp = get_time(ms=True)
-            sig.timestamp_since_start = get_time(ms=True) - RpcApi.START_TIME
-            if sig.timestamp_since_start < 5000:
-                sig.timestamp_since_start = random.randint(5000, 8000)
+            sig.field22 = self.session_hash
+            sig.epoch_timestamp_ms = get_time(ms=True)
+            sig.timestamp_ms_since_start = get_time(ms=True) - RpcApi.START_TIME
+            if sig.timestamp_ms_since_start < 5000:
+                sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
-            loc = sig.location_fix.add()
-            sen = sig.sensor_info.add()
+            loc = sig.location_updates.add()
+            sen = sig.sensor_updates.add()
 
-            sen.timestamp_snapshot = random.randint(sig.timestamp_since_start - 5000, sig.timestamp_since_start - 100)
-            loc.timestamp_snapshot = random.randint(sig.timestamp_since_start - 5000, sig.timestamp_since_start - 1000)
+            sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
+            loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
 
-            loc.provider = 'fused'
+            loc.name = 'fused'
             loc.latitude = request.latitude
             loc.longitude = request.longitude
 
@@ -238,12 +237,12 @@ class RpcApi:
 
             if random.random() > .95:
                 # no reading for roughly 1 in 20 updates
-                loc.course = -1
-                loc.speed = -1
+                loc.device_course = -1
+                loc.device_speed = -1
             else:
                 self.course = random.triangular(0, 360, self.course)
-                loc.course = self.course
-                loc.speed = random.triangular(0.2, 4.25, 1)
+                loc.device_course = self.course
+                loc.device_speed = random.triangular(0.2, 4.25, 1)
 
             loc.provider_status = 3
             loc.location_type = 1
@@ -257,9 +256,9 @@ class RpcApi:
                     loc.vertical_accuracy = random.choice((3, 4, 6, 6, 6, 6, 8, 12, 24))
                 loc.horizontal_accuracy = request.accuracy
 
-            sen.linear_acceleration_x = random.triangular(-1.7, 1.2, 0)
-            sen.linear_acceleration_y = random.triangular(-1.4, 1.9, 0)
-            sen.linear_acceleration_z = random.triangular(-1.4, .9, 0)
+            sen.acceleration_x = random.triangular(-1.7, 1.2, 0)
+            sen.acceleration_y = random.triangular(-1.4, 1.9, 0)
+            sen.acceleration_z = random.triangular(-1.4, .9, 0)
             sen.magnetic_field_x = random.triangular(-54, 50, 0)
             sen.magnetic_field_y = random.triangular(-51, 57, -4.8)
             sen.magnetic_field_z = random.triangular(-56, 43, -30)
@@ -275,20 +274,18 @@ class RpcApi:
             sen.gravity_z = random.triangular(-1, .7, -0.7)
             sen.status = 3
 
-            sig.unknown25 = -1553869577012279119
+            sig.version_hash = -1553869577012279119
 
             if self.device_info:
                 for key in self.device_info:
                     setattr(sig.device_info, key, self.device_info[key])
-                if self.device_info['device_brand'] == 'Apple':
-                    sig.activity_status.stationary = True
-            else:
-                sig.activity_status.stationary = True
+                if self.device_info.get('brand', 'Apple') == 'Apple':
+                    sig.ios_device_info.bool5 = True
 
             signature_proto = sig.SerializeToString()
 
             sig_request = SendEncryptedSignatureRequest()
-            sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_since_start)
+            sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_ms_since_start)
             plat = request.platform_requests.add()
             plat.type = 6
             plat.request_message = sig_request.SerializeToString()
