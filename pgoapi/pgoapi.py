@@ -35,7 +35,7 @@ from . import __title__, __version__, __copyright__
 from pgoapi.rpc_api import RpcApi
 from pgoapi.auth_ptc import AuthPtc
 from pgoapi.auth_google import AuthGoogle
-from pgoapi.utilities import parse_api_endpoint, get_lib_paths
+from pgoapi.utilities import parse_api_endpoint, get_lib_paths, get_time
 from pgoapi.exceptions import AuthException, BannedAccount, NotLoggedInException, ServerBusyOrOfflineException, NoPlayerPositionSetException, EmptySubrequestChainException, AuthTokenExpiredException, ServerApiEndpointRedirectException, UnexpectedResponseException
 
 from . import protos
@@ -161,26 +161,75 @@ class PGoApi:
         # Send empty initial request
         request = self.create_request()
         response = request.call()
+        time.sleep(1.172)
+
+        request = self.create_request()
+        response = request.call()
+        time.sleep(1.304)
         
-        time.sleep(1.5)
-        
+
         # Send GET_PLAYER only
         request = self.create_request()
-        request.get_player()
+        request.get_player(player_locale = {'country': 'US', 'language': 'en', 'timezone': 'America/Denver'})
         response = request.call()
         
         if response.get('responses', {}).get('GET_PLAYER', {}).get('banned', False):
             raise BannedAccount()
-        
-        time.sleep(1.5)
+
+        time.sleep(1.356)
 
         request = self.create_request()
-        request.download_remote_config_version()
+        request.download_remote_config_version(platform=1, app_version=4500)
         request.check_challenge()
         request.get_hatched_eggs()
         request.get_inventory()
         request.check_awarded_badges()
         request.download_settings()
+        response = request.call()
+        time.sleep(1.072)
+
+        responses = response.get('responses', {})
+        download_hash = responses.get('DOWNLOAD_SETTINGS', {}).get('hash')
+        inventory = responses.get('GET_INVENTORY', {}).get('inventory_delta', {})
+        timestamp = inventory.get('new_timestamp_ms')
+        player_level = None
+        for item in inventory.get('inventory_items', []):
+            player_stats = item.get('inventory_item_data', {}).get('player_stats', {})
+            if player_stats:
+                player_level = player_stats.get('level')
+                break
+
+        request = self.create_request()
+        request.get_asset_digest(platform=1, app_version=4500)
+        request.check_challenge()
+        request.get_hatched_eggs()
+        request.get_inventory(last_timestamp_ms=timestamp)
+        request.check_awarded_badges()
+        request.download_settings(hash=download_hash)
+        response = request.call()
+        time.sleep(1.709)
+
+        timestamp = response.get('responses', {}).get('GET_INVENTORY', {}).get('inventory_delta', {}).get('new_timestamp_ms')
+        request = self.create_request()
+        request.get_player_profile()
+        request.check_challenge()
+        request.get_hatched_eggs()
+        request.get_inventory(last_timestamp_ms=timestamp)
+        request.check_awarded_badges()
+        request.download_settings(hash=download_hash)
+        request.get_buddy_walked()
+        response = request.call()
+        time.sleep(1.326)
+
+        timestamp = response.get('responses', {}).get('GET_INVENTORY', {}).get('inventory_delta', {}).get('new_timestamp_ms')
+        request = self.create_request()
+        request.level_up_rewards(level=player_level)
+        request.check_challenge()
+        request.get_hatched_eggs()
+        request.get_inventory(last_timestamp_ms=timestamp)
+        request.check_awarded_badges()
+        request.download_settings(hash=download_hash)
+        request.get_buddy_walked()
         response = request.call()
 
         self.log.info('Finished RPC login sequence (iOS app simulation)')
