@@ -46,6 +46,7 @@ class AuthPtc(Auth):
     PTC_LOGIN_URL = 'https://sso.pokemon.com/sso/login?service=https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize'
     PTC_LOGIN_OAUTH = 'https://sso.pokemon.com/sso/oauth2.0/accessToken'
     PTC_LOGIN_CLIENT_SECRET = 'w8ScCUXJQc6kXKw8FiOhd8Fixzht18Dq3PEVkUCP5ZPxtgyWsbTvWHFLm2wNY0JR'
+    HEADERS = {'User-Agent': 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'}
 
     def __init__(self):
         Auth.__init__(self)
@@ -64,10 +65,8 @@ class AuthPtc(Auth):
         if not isinstance(username, six.string_types) or not isinstance(password, six.string_types):
             raise AuthException("Username/password not correctly specified")
 
-        head = {'User-Agent': 'niantic'}
-
         try:
-            r = self._session.get(self.PTC_LOGIN_URL, headers=head)
+            r = self._session.get(self.PTC_LOGIN_URL, headers=self.HEADERS)
         except ConnectionError as e:
             raise AuthException("Caught ConnectionError: %s", e)
 
@@ -87,7 +86,7 @@ class AuthPtc(Auth):
             self.log.error('PTC User Login Error - Field missing in response.content: %s', e)
             return False
 
-        r1 = self._session.post(self.PTC_LOGIN_URL, data=data, headers=head)
+        r1 = self._session.post(self.PTC_LOGIN_URL, data=data, headers=self.HEADERS)
 
         ticket = None
         try:
@@ -129,7 +128,7 @@ class AuthPtc(Auth):
                 'code': self._refresh_token,
             }
 
-            r2 = self._session.post(self.PTC_LOGIN_OAUTH, data=data1)
+            r2 = self._session.post(self.PTC_LOGIN_OAUTH, data=data1, headers=self.HEADERS)
 
             qs = r2.content.decode('utf-8')
             token_data = parse_qs(qs)
