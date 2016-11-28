@@ -202,7 +202,7 @@ class RpcApi:
             request.auth_info.provider = self._auth_provider.get_name()
             request.auth_info.token.contents = self._auth_provider.get_access_token()
             request.auth_info.token.unknown2 = self.token2
-            ticket_serialized = request.auth_info.SerializeToString()  #Sig uses this when no auth_ticket available
+            ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
 
         if self._signature_gen:
             sig = SignalLog()
