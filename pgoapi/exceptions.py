@@ -26,7 +26,7 @@ Author: tjado <https://github.com/tejado>
 class AuthException(Exception):
     pass
 
-class BannedAccount(Exception):
+class BannedAccountException(Exception):
     """Raised when account is banned"""
 
 class NotLoggedInException(Exception):

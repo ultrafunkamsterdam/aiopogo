@@ -36,7 +36,7 @@ from pgoapi.rpc_api import RpcApi
 from pgoapi.auth_ptc import AuthPtc
 from pgoapi.auth_google import AuthGoogle
 from pgoapi.utilities import parse_api_endpoint, get_lib_paths, get_time
-from pgoapi.exceptions import AuthException, BannedAccount, NotLoggedInException, ServerBusyOrOfflineException, NoPlayerPositionSetException, EmptySubrequestChainException, AuthTokenExpiredException, ServerApiEndpointRedirectException, UnexpectedResponseException
+from pgoapi.exceptions import AuthException, BannedAccountException, NotLoggedInException, ServerBusyOrOfflineException, NoPlayerPositionSetException, EmptySubrequestChainException, AuthTokenExpiredException, ServerApiEndpointRedirectException, UnexpectedResponseException
 
 from . import protos
 from pogoprotos.networking.requests.request_type_pb2 import RequestType
@@ -166,15 +166,14 @@ class PGoApi:
         request = self.create_request()
         response = request.call()
         time.sleep(1.304)
-        
 
         # Send GET_PLAYER only
         request = self.create_request()
         request.get_player(player_locale = {'country': 'US', 'language': 'en', 'timezone': 'America/Denver'})
         response = request.call()
-        
+
         if response.get('responses', {}).get('GET_PLAYER', {}).get('banned', False):
-            raise BannedAccount()
+            raise BannedAccountException()
 
         time.sleep(1.356)
 
