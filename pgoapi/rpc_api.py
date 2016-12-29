@@ -103,7 +103,7 @@ class RpcApi:
         if RpcApi.RPC_ID==0 :  #Startup
             RpcApi.RPC_ID=1
             if (self.device_info and
-                    self.device_info.get('brand', 'Apple') != 'Apple':
+                    self.device_info.get('brand', 'Apple') != 'Apple'):
                 rand = 0x53B77E48
             else:
                 rand = 0x000041A7
@@ -230,14 +230,14 @@ class RpcApi:
             if not altitude:
                 altitude = random.triangular(300, 400, 350)
 
-            self._hash_engine.hash(sig.timestamp, request.latitude, request.longitude, altitude, ticket_serialized, sig.session_hash, request.requests)
+            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, altitude, ticket_serialized, sig.field22, request.requests)
             sig.location_hash_by_token_seed = self._hash_engine.get_location_auth_hash()
             sig.location_hash = self._hash_engine.get_location_hash()
             for req_hash in self._hash_engine.get_request_hashes():
-                sig.request_hash.append(ctypes.c_uint64(req_hash).value)
+                sig.request_hashes.append(req_hash)
 
-            loc = sig.location_fix.add()
-            sen = sig.sensor_info.add()
+            loc = sig.location_updates.add()
+            sen = sig.sensor_updates.add()
 
             sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
             loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
