@@ -2,10 +2,13 @@ from aiohttp import TCPConnector, ClientSession
 from asyncio import get_event_loop
 
 class Session:
+    session = None
+
     @classmethod
     def get(cls):
         try:
-            return cls._session
+            session = cls._session
+            return session
         except AttributeError:
             loop = get_event_loop()
             connector = TCPConnector(limit=150, loop=loop)
