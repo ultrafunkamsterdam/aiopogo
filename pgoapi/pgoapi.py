@@ -29,6 +29,8 @@ import re
 import logging
 import time
 
+logging.getLogger('aiohttp.client').setLevel(40)
+
 from . import __title__, __version__, __copyright__
 from pgoapi.rpc_api import RpcApi
 from pgoapi.auth_ptc import AuthPtc
@@ -114,7 +116,7 @@ class PGoApi:
 
     def create_request(self):
         request = PGoApiRequest(self, self._position_lat, self._position_lng,
-                                self._position_alt, self.device_info)
+                                self._position_alt, self.device_info, self.proxy)
         return request
 
     def activate_hash_server(self, hash_server_token):
@@ -138,7 +140,7 @@ class PGoApi:
 class PGoApiRequest:
 
     def __init__(self, parent, position_lat, position_lng, position_alt,
-                 device_info=None):
+                 device_info=None, proxy_config=None):
         self.log = logging.getLogger(__name__)
 
         self.__parent__ = parent
@@ -153,6 +155,7 @@ class PGoApiRequest:
 
         self._req_method_list = []
         self.device_info = device_info
+        self.proxy = proxy_config
 
     async def call(self):
         if (self._position_lat is None) or (self._position_lng is None):
@@ -162,7 +165,7 @@ class PGoApiRequest:
             self.log.info('Not logged in')
             raise NotLoggedInException
 
-        request = RpcApi(self._auth_provider, self.device_info)
+        request = RpcApi(self._auth_provider, self.device_info, proxy=self.proxy)
 
         hash_server_token = self.__parent__.get_hash_server_token()
         if hash_server_token:

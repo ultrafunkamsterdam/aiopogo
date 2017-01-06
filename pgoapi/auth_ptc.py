@@ -33,12 +33,12 @@ import logging
 
 from urllib.parse import parse_qs
 from six import string_types
-from aiohttp import TCPConnector, ClientSession, ClientResponseError
-from asyncio import get_event_loop
+from aiohttp import ClientResponseError
 
 from pgoapi.auth import Auth
 from pgoapi.utilities import get_time
 from pgoapi.exceptions import AuthException, InvalidCredentialsException
+from pgoapi.session import Session
 
 
 class AuthPtc(Auth):
@@ -46,17 +46,14 @@ class AuthPtc(Auth):
     PTC_LOGIN_URL = 'https://sso.pokemon.com/sso/login?service=https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize'
     PTC_LOGIN_OAUTH = 'https://sso.pokemon.com/sso/oauth2.0/accessToken'
     PTC_LOGIN_CLIENT_SECRET = 'w8ScCUXJQc6kXKw8FiOhd8Fixzht18Dq3PEVkUCP5ZPxtgyWsbTvWHFLm2wNY0JR'
-    loop = get_event_loop()
-    _connector = TCPConnector(limit=100, loop=loop)
-    _session = ClientSession(connector=_connector,
-                             loop=loop,
-                             headers={'User-Agent': 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'})
+    HEADERS = {'User-Agent': 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'}
 
     def __init__(self):
         super().__init__()
 
         self._auth_provider = 'ptc'
         self.proxy = None
+        self._session = Session.get()
 
     def set_proxy(self, proxy_config):
         self.proxy = proxy_config
@@ -68,7 +65,7 @@ class AuthPtc(Auth):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
         try:
-            async with self._session.get(self.PTC_LOGIN_URL, timeout=30, proxy=self.proxy) as resp:
+            async with self._session.get(self.PTC_LOGIN_URL, timeout=30, proxy=self.proxy, headers=self.HEADERS) as resp:
                 jdata = await resp.json()
         except ClientResponseError as e:
             raise AuthException('Caught ConnectionError.') from e
@@ -88,7 +85,7 @@ class AuthPtc(Auth):
 
         ticket = None
         try:
-            async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
+            async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy, headers=self.HEADERS) as r1:
                 ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
         except Exception as e:
             raise AuthException('Could not retrieve token!') from e
@@ -124,7 +121,7 @@ class AuthPtc(Auth):
             }
 
             try:
-                async with self._session.post(self.PTC_LOGIN_OAUTH, data=data1, proxy=self.proxy) as r2:
+                async with self._session.post(self.PTC_LOGIN_OAUTH, data=data1, proxy=self.proxy, headers=self.HEADERS) as r2:
                     qs = await r2.text()
                 token_data = parse_qs(qs)
             except Exception as e:

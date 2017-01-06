@@ -49,7 +49,7 @@ class AuthGoogle(Auth):
     def set_proxy(self, proxy_config):
         self._proxy = proxy_config
 
-    def user_login(self, username, password):
+    async def user_login(self, username, password):
         self.log.info('Google User Login for: {}'.format(username))
 
         if not isinstance(username, string_types) or not isinstance(password, string_types):
@@ -76,7 +76,7 @@ class AuthGoogle(Auth):
         self.log.info('Google Refresh Token provided by user')
         self._refresh_token = refresh_token
 
-    def get_access_token(self, force_refresh = False):
+    async def get_access_token(self, force_refresh = False):
         token_validity = self.check_access_token()
 
         if token_validity is True and force_refresh is False:

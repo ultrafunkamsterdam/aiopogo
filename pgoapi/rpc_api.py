@@ -38,8 +38,7 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import TCPConnector, ClientSession, ClientResponseError
-from asyncio import get_event_loop
+from aiohttp import ClientResponseError
 
 from importlib import import_module
 
@@ -48,6 +47,7 @@ from pgoapi.utilities import to_camel_case, get_time, get_format_time_diff, Rand
 from pgoapi.hash_library import HashLibrary
 from pgoapi.hash_engine import HashEngine
 from pgoapi.hash_server import HashServer
+from pgoapi.session import Session
 
 from . import protos
 from pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope
@@ -58,16 +58,10 @@ from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb
 
 
 class RpcApi:
-    loop = get_event_loop()
-    _connector = TCPConnector(limit=150, loop=loop)
-    _session = ClientSession(connector=_connector,
-                             loop=loop,
-                             headers={'User-Agent': 'Niantic App'})
-
     RPC_ID = 0
     START_TIME = 0
 
-    def __init__(self, auth_provider, device_info):
+    def __init__(self, auth_provider, device_info, proxy=None):
 
         self.log = logging.getLogger(__name__)
 
@@ -79,6 +73,7 @@ class RpcApi:
         self._hash_engine = None
         self._api_version = "0_45"
         self.request_proto = None
+        self.proxy = proxy
 
         if RpcApi.START_TIME == 0:
             RpcApi.START_TIME = get_time(ms=True)
@@ -89,6 +84,7 @@ class RpcApi:
         self.course = random.uniform(0, 360)
 
         self.device_info = device_info
+        self._session = Session.get()
 
     def activate_signature(self, signature_lib_path):
         self._signature_gen = True
@@ -139,7 +135,7 @@ class RpcApi:
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, timeout=30) as resp:
+            async with self._session.post(endpoint, data=request_proto_serialized, timeout=30, proxy=self.proxy) as resp:
                 if resp.status == 400:
                     raise BadRequestException("400: Bad Request")
                 if resp.status == 403:
