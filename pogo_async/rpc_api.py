@@ -39,6 +39,7 @@ import binascii
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientResponseError
+from asyncio import TimeoutError
 
 from importlib import import_module
 
@@ -150,7 +151,7 @@ class RpcApi:
                 content = await resp.read()
                 if not content:
                     raise MalformedNianticResponseException('Empty server response!')
-        except ClientResponseError as e:
+        except (ClientResponseError, TimeoutError) as e:
             raise NianticOfflineException from e
 
         return content

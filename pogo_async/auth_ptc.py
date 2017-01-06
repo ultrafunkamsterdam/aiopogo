@@ -34,7 +34,7 @@ import logging
 from urllib.parse import parse_qs
 from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientResponseError
-from asyncio import get_event_loop
+from asyncio import get_event_loop, TimeoutError
 
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
@@ -79,11 +79,11 @@ class AuthPtc(Auth):
         try:
             async with self._session.get(self.PTC_LOGIN_URL, timeout=30, proxy=self.proxy) as resp:
                 jdata = await resp.json()
+        except TimeoutError as e:
+            raise AuthException('Request timed out.') from e
         except ClientResponseError as e:
-            self.log.error('caught connectionerror')
             raise AuthException('Caught ConnectionError.') from e
         except json.JSONDecodeError as e:
-            self.log.error('unable to parse response')
             raise AuthException('Unable to parse response') from e
 
         try:
@@ -95,7 +95,6 @@ class AuthPtc(Auth):
                 'password': password,
             }
         except (ValueError, KeyError) as e:
-            self.log.error('field missing in response.')
             raise AuthException('PTC User Login Error - Field missing in response.') from e
 
         ticket = None
@@ -103,7 +102,6 @@ class AuthPtc(Auth):
             async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
                 ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
         except Exception as e:
-            self.log.error('could not retrieve token.')
             raise AuthException('Could not retrieve token!') from e
 
         self._refresh_token = ticket
@@ -143,7 +141,6 @@ class AuthPtc(Auth):
                         qs = await r2.text()
                     token_data = parse_qs(qs)
                 except Exception as e:
-                    self.log.error('could not retrieve qs.')
                     raise AuthException('Could not retrieve qs!') from e
 
                 access_token = token_data.get('access_token', None)
@@ -168,7 +165,6 @@ class AuthPtc(Auth):
                 else:
                     self._access_token = None
                     self._login = False
-                    self.log.error('could not retrieve PTC access token.')
                     raise AuthException("Could not retrieve a PTC Access Token")
             finally:
                 self.session_close()
