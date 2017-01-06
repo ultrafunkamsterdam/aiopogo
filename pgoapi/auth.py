@@ -108,7 +108,6 @@ class Auth:
     def get_access_token(self, force_refresh = False):
         raise NotImplementedError()
 
-
     def check_access_token(self):
         """
         Add few seconds to now so the token get refreshed 

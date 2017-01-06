@@ -2,24 +2,26 @@ from __future__ import absolute_import
 
 import ctypes
 import base64
-import requests
+import json
 
+from aiohttp import TCPConnector, ClientSession, ClientResponseError
+from asyncio import get_event_loop
 from pgoapi.hash_engine import HashEngine
 from pgoapi.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
 
 class HashServer(HashEngine):
-    _session = requests.session()
-    _adapter = requests.adapters.HTTPAdapter(pool_maxsize=150, pool_block=True)
-    _session.mount('https://', _adapter)
-    _session.verify = True
-    _session.headers.update({'User-Agent': 'Python pgoapi @pogodev'})
+    loop = get_event_loop()
+    _connector = TCPConnector(limit=150, loop=loop)
+    _session = ClientSession(connector=_connector,
+                             loop=loop,
+                             headers={'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pgoapi @Noctem'})
     endpoint = "https://pokehash.buddyauth.com/api/v121_2/hash"
     status = {}
 
     def __init__(self, auth_token):
-        self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'X-AuthToken' : auth_token}
+        self.headers = {'X-AuthToken' : auth_token}
 
-    def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requestslist):
+    async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requestslist):
         self.location_hash = None
         self.location_auth_hash = None
         self.request_hashes = []
@@ -35,43 +37,47 @@ class HashServer(HashEngine):
         for request in requestslist:
             payload["Requests"].append(base64.b64encode(request.SerializeToString()).decode('ascii'))
 
+        payload = json.dumps(payload)
+
         # request hashes from hashing server
-        try:
-            response = self._session.post(self.endpoint, json=payload, headers=self.headers, timeout=30)
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as error:
-            raise HashingOfflineException(error)
-
-        if response.status_code == 400:
-            raise BadHashRequestException("400: Bad request, error: {}".format(response.text))
-        elif response.status_code == 403:
-            raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
-        elif response.status_code == 429:
-            raise HashingQuotaExceededException("429: Request limited, error: {}".format(response.text))
-        elif response.status_code in (502, 503, 504):
-            raise HashingOfflineException('{} Server Error'.format(response.status_code))
-        elif response.status_code != 200:
-            error = 'Unexpected HTTP server response - needs 200 got {c}. {t}'.format(
-                c=response.status_code, t=response.text)
-            raise UnexpectedHashResponseException(error)
-
-        if not response.content:
-            raise MalformedHashResponseException('Response was empty')
-
-        headers = response.headers
-        try:
-            self.status['period'] = int(headers.get('X-RatePeriodEnd'))
-            self.status['remaining'] = int(headers.get('X-RateRequestsRemaining'))
-            self.status['maximum'] = int(headers.get('X-MaxRequestCount'))
-        except TypeError:
-            pass
 
         try:
-            response_parsed = response.json()
-        except ValueError:
-            raise MalformedHashResponseException('Unable to parse JSON from hash server.')
+            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=30) as resp:
+                if resp.status == 400:
+                    text = await resp.text()
+                    raise BadHashRequestException("400: Bad request, error: {}".format(text))
+                elif resp.status == 403:
+                    raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
+                elif resp.status == 429:
+                    raise HashingQuotaExceededException("429: Request limited.")
+                elif resp.status in (502, 503, 504):
+                    raise HashingOfflineException('{} Server Error'.format(resp.status))
+                elif resp.status != 200:
+                    text = await resp.text()
+                    error = 'Unexpected HTTP server response - needs 200 got {c}. {t}'.format(
+                        c=resp.status, t=text)
+                    raise UnexpectedHashResponseException(error)
 
-        self.location_auth_hash = ctypes.c_int32(response_parsed['locationAuthHash']).value
-        self.location_hash = ctypes.c_int32(response_parsed['locationHash']).value
+                headers = resp.headers
+                try:
+                    self.status['period'] = int(headers.get('X-RatePeriodEnd'))
+                    self.status['remaining'] = int(headers.get('X-RateRequestsRemaining'))
+                    self.status['maximum'] = int(headers.get('X-MaxRequestCount'))
+                except TypeError:
+                    pass
 
-        for request_hash in response_parsed['requestHashes']:
-            self.request_hashes.append(ctypes.c_int64(request_hash).value)
+                try:
+                    response_parsed = await resp.json()
+                except (json.JSONDecodeError, ValueError) as e:
+                    raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
+        except ClientResponseError as e:
+            raise HashingOfflineException from e
+
+        try:
+            self.location_auth_hash = ctypes.c_int32(response_parsed['locationAuthHash']).value
+            self.location_hash = ctypes.c_int32(response_parsed['locationHash']).value
+
+            for request_hash in response_parsed['requestHashes']:
+                self.request_hashes.append(ctypes.c_int64(request_hash).value)
+        except Exception as e:
+            raise MalformedHashResponseException('Unable to load values') from e

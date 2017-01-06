@@ -26,9 +26,7 @@ Author: tjado <https://github.com/tejado>
 from __future__ import absolute_import
 
 import re
-import six
 import logging
-import requests
 import time
 
 from . import __title__, __version__, __copyright__
@@ -45,14 +43,11 @@ logger = logging.getLogger(__name__)
 
 
 class PGoApi:
-
-    def __init__(self, provider=None, oauth2_refresh_token=None, username=None, password=None, position_lat=None, position_lng=None, position_alt=None, proxy_config=None, device_info=None):
+    def __init__(self, provider=None, position_lat=None, position_lng=None, position_alt=None, proxy_config=None, device_info=None):
         self.set_logger()
         self.log.info('%s v%s - %s', __title__, __version__, __copyright__)
 
         self._auth_provider = None
-        if provider is not None and ((username is not None and password is not None) or (oauth2_refresh_token is not None)):
-            self.set_authentication(provider, oauth2_refresh_token, username, password, proxy_config)
 
         self.set_api_endpoint("pgorelease.nianticlabs.com/plfe")
 
@@ -62,19 +57,14 @@ class PGoApi:
 
         self._hash_server_token = None
 
-        self._session = requests.session()
-        self._session.headers.update({'User-Agent': 'Niantic App'})
-        self._session.verify = True
-
-        if proxy_config is not None:
-            self._session.proxies = proxy_config
+        self.proxy = proxy_config
 
         self.device_info = device_info
 
     def set_logger(self, logger=None):
         self.log = logger or logging.getLogger(__name__)
 
-    def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None):
+    async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None):
         if provider == 'ptc':
             self._auth_provider = AuthPtc()
         elif provider == 'google':
@@ -92,7 +82,7 @@ class PGoApi:
         if oauth2_refresh_token is not None:
             self._auth_provider.set_refresh_token(oauth2_refresh_token)
         elif username and password:
-            if not self._auth_provider.user_login(username, password):
+            if not await self._auth_provider.user_login(username, password):
                 raise AuthException("User login failed!")
         else:
             raise InvalidCredentialsException("Invalid Credential Input - Please provide username/password or an oauth2 refresh token")
@@ -108,7 +98,7 @@ class PGoApi:
         self._position_alt = alt
 
     def set_proxy(self, proxy_config):
-        self._session.proxies = proxy_config
+        self.proxy = proxy_config
 
     def get_api_endpoint(self):
         return self._api_endpoint
@@ -133,133 +123,16 @@ class PGoApi:
     def get_hash_server_token(self):
         return self._hash_server_token
 
-    def __getattr__(self, func):
-        def function(**kwargs):
+    async def __getattr__(self, func):
+        async def function(**kwargs):
             request = self.create_request()
             getattr(request, func)(_call_direct=True, **kwargs )
-            return request.call()
+            return await request.call()
 
         if func.upper() in RequestType.keys():
-            return function
+            return await function
         else:
             raise AttributeError
-
-    def app_simulation_login(self):
-        self.log.info('Starting RPC login sequence (iOS app simulation)')
-
-        # Send empty initial request
-        request = self.create_request()
-        response = request.call()
-        time.sleep(1.172)
-
-        request = self.create_request()
-        response = request.call()
-        time.sleep(1.304)
-
-        # Send GET_PLAYER only
-        request = self.create_request()
-        request.get_player(player_locale = {'country': 'US', 'language': 'en', 'timezone': 'America/Denver'})
-        response = request.call()
-
-        if response.get('responses', {}).get('GET_PLAYER', {}).get('banned', False):
-            raise BannedAccountException
-
-        time.sleep(1.356)
-
-        request = self.create_request()
-        request.download_remote_config_version(platform=1, app_version=4500)
-        request.check_challenge()
-        request.get_hatched_eggs()
-        request.get_inventory()
-        request.check_awarded_badges()
-        request.download_settings()
-        response = request.call()
-        time.sleep(1.072)
-
-        responses = response.get('responses', {})
-        download_hash = responses.get('DOWNLOAD_SETTINGS', {}).get('hash')
-        inventory = responses.get('GET_INVENTORY', {}).get('inventory_delta', {})
-        timestamp = inventory.get('new_timestamp_ms')
-        player_level = None
-        for item in inventory.get('inventory_items', []):
-            player_stats = item.get('inventory_item_data', {}).get('player_stats', {})
-            if player_stats:
-                player_level = player_stats.get('level')
-                break
-
-        request = self.create_request()
-        request.get_asset_digest(platform=1, app_version=4500)
-        request.check_challenge()
-        request.get_hatched_eggs()
-        request.get_inventory(last_timestamp_ms=timestamp)
-        request.check_awarded_badges()
-        request.download_settings(hash=download_hash)
-        response = request.call()
-        time.sleep(1.709)
-
-        timestamp = response.get('responses', {}).get('GET_INVENTORY', {}).get('inventory_delta', {}).get('new_timestamp_ms')
-        request = self.create_request()
-        request.get_player_profile()
-        request.check_challenge()
-        request.get_hatched_eggs()
-        request.get_inventory(last_timestamp_ms=timestamp)
-        request.check_awarded_badges()
-        request.download_settings(hash=download_hash)
-        request.get_buddy_walked()
-        response = request.call()
-        time.sleep(1.326)
-
-        timestamp = response.get('responses', {}).get('GET_INVENTORY', {}).get('inventory_delta', {}).get('new_timestamp_ms')
-        request = self.create_request()
-        request.level_up_rewards(level=player_level)
-        request.check_challenge()
-        request.get_hatched_eggs()
-        request.get_inventory(last_timestamp_ms=timestamp)
-        request.check_awarded_badges()
-        request.download_settings(hash=download_hash)
-        request.get_buddy_walked()
-        response = request.call()
-
-        self.log.info('Finished RPC login sequence (iOS app simulation)')
-
-        return response
-
-    """
-    The login function is not needed anymore but still in the code for backward compatibility"
-    """
-    def login(self, provider, username, password, lat=None, lng=None, alt=None, app_simulation=True):
-
-        if lat and lng:
-            self._position_lat = lat
-            self._position_lng = lng
-        if alt:
-            self._position_alt = alt
-
-        try:
-            self.set_authentication(provider, username=username, password=password, proxy_config=self._session.proxies)
-        except AuthException as e:
-            self.log.error('Login process failed: %s', e)
-            return False
-
-        if app_simulation:
-            response = self.app_simulation_login()
-        else:
-            self.log.info('Starting minimal RPC login sequence')
-            response = self.get_player()
-            self.log.info('Finished minimal RPC login sequence')
-
-        if not response:
-            self.log.info('Login failed!')
-            return False
-
-        challenge_url = response.get('responses', {}).get('CHECK_CHALLENGE', {}).get('challenge_url', ' ')
-        if challenge_url != ' ':
-            self.log.error('CAPCHA required: ' + challenge_url)
-            return challenge_url
-
-        self.log.info('Login process completed')
-
-        return True
 
 
 class PGoApiRequest:
@@ -281,7 +154,7 @@ class PGoApiRequest:
         self._req_method_list = []
         self.device_info = device_info
 
-    def call(self):
+    async def call(self):
         if (self._position_lat is None) or (self._position_lng is None):
             raise NoPlayerPositionSetException
 
@@ -290,7 +163,6 @@ class PGoApiRequest:
             raise NotLoggedInException
 
         request = RpcApi(self._auth_provider, self.device_info)
-        request._session = self.__parent__._session
 
         hash_server_token = self.__parent__.get_hash_server_token()
         if hash_server_token:
@@ -314,7 +186,7 @@ class PGoApiRequest:
             execute = False
 
             try:
-                response = request.request(self._api_endpoint, self._req_method_list, self.get_position())
+                response = await request.request(self._api_endpoint, self._req_method_list, self.get_position())
             except AuthTokenExpiredException as e:
                 """
                 This exception only occures if the OAUTH service provider (google/ptc) didn't send any expiration date

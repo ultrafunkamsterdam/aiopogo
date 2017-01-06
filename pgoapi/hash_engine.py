@@ -4,7 +4,7 @@ class HashEngine:
         self.location_auth_hash = None
         self.request_hashes = []
 
-    def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
+    async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
         raise NotImplementedError()
 
     def get_location_hash(self):

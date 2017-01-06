@@ -38,6 +38,8 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
+from aiohttp import TCPConnector, ClientSession, ClientResponseError
+from asyncio import get_event_loop
 
 from importlib import import_module
 
@@ -56,6 +58,11 @@ from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb
 
 
 class RpcApi:
+    loop = get_event_loop()
+    _connector = TCPConnector(limit=150, loop=loop)
+    _session = ClientSession(connector=_connector,
+                             loop=loop,
+                             headers={'User-Agent': 'Niantic App'})
 
     RPC_ID = 0
     START_TIME = 0
@@ -127,25 +134,39 @@ class RpcApi:
         class_ = getattr(import_module(module_), to_camel_case(class_))
         return class_
 
-    def _make_rpc(self, endpoint, request_proto_plain):
+    async def _make_rpc(self, endpoint, request_proto_plain):
         self.log.debug('Execution of RPC')
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            http_response = self._session.post(endpoint, data=request_proto_serialized, timeout=30)
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-            raise NianticOfflineException(e)
+            async with self._session.post(endpoint, data=request_proto_serialized, timeout=30) as resp:
+                if resp.status == 400:
+                    raise BadRequestException("400: Bad Request")
+                if resp.status == 403:
+                    raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong...")
+                elif resp.status in (502, 503, 504):
+                    raise NianticOfflineException('{} Server Error'.format(resp.status))
+                elif resp.status != 200:
+                    error = 'Unexpected HTTP server response - needs 200 got {}'.format(resp.status)
+                    self.log.warning(error)
+                    raise UnexpectedResponseException(error)
 
-        return http_response
+                content = await resp.read()
+                if not content:
+                    raise MalformedNianticResponseException('Empty server response!')
+        except ClientResponseError as e:
+            raise NianticOfflineException from e
 
-    def request(self, endpoint, subrequests, player_position):
+        return content
+
+    async def request(self, endpoint, subrequests, player_position):
 
         if not self._auth_provider or self._auth_provider.is_login() is False:
             raise NotLoggedInException()
 
-        self.request_proto = self.request_proto or self._build_main_request(subrequests, player_position)
-        response = self._make_rpc(endpoint, self.request_proto)
+        self.request_proto = self.request_proto or await self._build_main_request(subrequests, player_position)
 
+        response = await self._make_rpc(endpoint, self.request_proto)
         response_dict = self._parse_main_response(response, subrequests)
 
         self.check_authentication(response_dict)
@@ -187,7 +208,7 @@ class RpcApi:
             else:
                 self.log.debug('Received Session Ticket valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
 
-    def _build_main_request(self, subrequests, player_position=None):
+    async def _build_main_request(self, subrequests, player_position=None):
         self.log.debug('Generating main RPC request...')
 
         request = RequestEnvelope()
@@ -211,7 +232,7 @@ class RpcApi:
         else:
             self.log.debug('No Session Ticket found - using OAUTH Access Token')
             request.auth_info.provider = self._auth_provider.get_name()
-            request.auth_info.token.contents = self._auth_provider.get_access_token()
+            request.auth_info.token.contents = await self._auth_provider.get_access_token()
             request.auth_info.token.unknown2 = self.token2
             ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
 
@@ -224,7 +245,7 @@ class RpcApi:
             if sig.timestamp_ms_since_start < 5000:
                 sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
-            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+            await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
             sig.location_hash_by_token_seed = self._hash_engine.get_location_auth_hash()
             sig.location_hash = self._hash_engine.get_location_hash()
             for req_hash in self._hash_engine.get_request_hashes():
@@ -373,37 +394,18 @@ class RpcApi:
 
         return mainrequest
 
+
     def _parse_main_response(self, response_raw, subrequests):
         self.log.debug('Parsing main RPC response...')
 
-        if response_raw.status_code == 400:
-            raise BadRequestException("400: Bad Request")
-        if response_raw.status_code == 403:
-            raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong...")
-        elif response_raw.status_code in (502, 503, 504):
-            raise NianticOfflineException('{} Server Error'.format(response_raw.status_code))
-        elif response_raw.status_code != 200:
-            error = 'Unexpected HTTP server response - needs 200 got {}'.format(response_raw.status_code)
-            self.log.warning(error)
-            self.log.debug('HTTP output: \n%s', response_raw.content.decode('utf-8'))
-            raise UnexpectedResponseException(error)
-
-        if not response_raw.content:
-            self.log.warning('Empty server response!')
-            raise MalformedNianticResponseException('Empty server response!')
-
         response_proto = ResponseEnvelope()
         try:
-            response_proto.ParseFromString(response_raw.content)
+            response_proto.ParseFromString(response_raw)
         except message.DecodeError as e:
             self.log.error('Could not parse response: %s', e)
-            raise MalformedNianticResponseException('Could not decode response.')
+            raise MalformedNianticResponseException('Could not parse response.')
 
         self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)
-        try:
-            self.log.debug('Decode raw over protoc (protoc has to be in your PATH):\n\r%s', self.decode_raw(response_raw.content).decode('utf-8'))
-        except Exception:
-            self.log.debug('Error during protoc parsing - ignored.')
 
         response_proto_dict = protobuf_to_dict(response_proto)
         response_proto_dict = self._parse_sub_responses(response_proto, subrequests, response_proto_dict)
@@ -412,6 +414,7 @@ class RpcApi:
             raise MalformedNianticResponseException('Could not convert protobuf to dict.')
 
         return response_proto_dict
+
 
     def _parse_sub_responses(self, response_proto, subrequests_list, response_proto_dict):
         self.log.debug('Parsing sub RPC responses...')

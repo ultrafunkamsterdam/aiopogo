@@ -14,7 +14,7 @@ class HashLibrary(HashEngine):
         self._hash_lib.compute_hash.argtypes = (ctypes.POINTER(ctypes.c_ubyte), ctypes.c_uint32)
         self._hash_lib.compute_hash.restype = ctypes.c_uint64
 
-    def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
+    async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
         self.location_hash = None
         self.location_auth_hash = None
         self.request_hashes = []
