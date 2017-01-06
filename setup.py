@@ -10,13 +10,13 @@ install_reqs = parse_requirements(path_req, session=False)
 
 reqs = [str(ir.req) for ir in install_reqs]
 
-setup(name='pgoapi',
+setup(name='pogo_async',
       author = 'Noctem',
-      description = 'Pokemon Go API lib',
-      version = '1.1.7',
+      description = 'Asynchronous Pokemon Go API lib',
+      version = '1.0',
       url = 'https://github.com/Noctem/pgoapi',
       download_url = "https://github.com/Noctem/pgoapi/releases",
       packages = find_packages(),
       install_requires = reqs,
-      package_data={'pgoapi': ['lib_0_45/*', 'lib_0_51/*']}
+      package_data={'pogo_async': ['lib_0_45/*', 'lib_0_51/*']}
       )

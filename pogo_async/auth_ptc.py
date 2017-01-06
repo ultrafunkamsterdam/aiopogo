@@ -36,9 +36,9 @@ from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientResponseError
 from asyncio import get_event_loop
 
-from pgoapi.auth import Auth
-from pgoapi.utilities import get_time
-from pgoapi.exceptions import AuthException, InvalidCredentialsException
+from pogo_async.auth import Auth
+from pogo_async.utilities import get_time
+from pogo_async.exceptions import AuthException, InvalidCredentialsException
 
 
 class AuthPtc(Auth):

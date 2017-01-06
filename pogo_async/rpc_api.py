@@ -42,12 +42,12 @@ from aiohttp import ClientResponseError
 
 from importlib import import_module
 
-from pgoapi.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
-from pgoapi.utilities import to_camel_case, get_time, get_format_time_diff, Rand48, long_to_bytes, f2i
-from pgoapi.hash_library import HashLibrary
-from pgoapi.hash_engine import HashEngine
-from pgoapi.hash_server import HashServer
-from pgoapi.session import Session
+from pogo_async.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
+from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, Rand48, long_to_bytes, f2i
+from pogo_async.hash_library import HashLibrary
+from pogo_async.hash_engine import HashEngine
+from pogo_async.hash_server import HashServer
+from pogo_async.session import Session
 
 from . import protos
 from pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope

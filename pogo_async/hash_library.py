@@ -3,8 +3,8 @@ from __future__ import absolute_import
 import ctypes
 import struct
 
-from pgoapi.hash_engine import HashEngine
-from pgoapi.utilities import d2h
+from pogo_async.hash_engine import HashEngine
+from pogo_async.utilities import d2h
 
 HASH_SEED = 0x46E945F8  # static hash seed from app
 

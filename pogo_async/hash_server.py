@@ -5,16 +5,16 @@ import base64
 import json
 
 from aiohttp import ClientResponseError
-from pgoapi.hash_engine import HashEngine
-from pgoapi.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
-from pgoapi.session import Session
+from pogo_async.hash_engine import HashEngine
+from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
+from pogo_async.session import Session
 
 class HashServer(HashEngine):
     endpoint = "https://pokehash.buddyauth.com/api/v121_2/hash"
     status = {}
 
     def __init__(self, auth_token):
-        self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pgoapi @Noctem', 'X-AuthToken' : auth_token}
+        self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}
         self._session = Session.get()
 
     async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requestslist):

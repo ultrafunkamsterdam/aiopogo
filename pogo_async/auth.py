@@ -26,7 +26,7 @@ Author: tjado <https://github.com/tejado>
 from __future__ import absolute_import
 
 import logging
-from pgoapi.utilities import get_time, get_format_time_diff
+from pogo_async.utilities import get_time, get_format_time_diff
 
 class Auth:
 

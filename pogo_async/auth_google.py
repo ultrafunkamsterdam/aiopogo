@@ -27,8 +27,8 @@ from __future__ import absolute_import
 
 import logging
 
-from pgoapi.auth import Auth
-from pgoapi.exceptions import AuthException, InvalidCredentialsException
+from pogo_async.auth import Auth
+from pogo_async.exceptions import AuthException, InvalidCredentialsException
 from gpsoauth import perform_master_login, perform_oauth
 from six import string_types
 

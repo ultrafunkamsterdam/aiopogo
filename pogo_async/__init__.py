@@ -25,14 +25,14 @@ Author: tjado <https://github.com/tejado>
 
 from __future__ import absolute_import
 
-from pgoapi.exceptions import PleaseInstallProtobufVersion3
+from pogo_async.exceptions import PleaseInstallProtobufVersion3
 
 import pkg_resources
 import logging
 
-__title__ = 'pgoapi'
-__version__ = '1.1.7'
-__author__ = 'tjado'
+__title__ = 'pogo_async'
+__version__ = '1.0'
+__author__ = 'Noctem'
 __license__ = 'MIT License'
 __copyright__ = 'Copyright (c) 2016 tjado <https://github.com/tejado>'
 
@@ -47,19 +47,13 @@ except Exception:
 if (not protobuf_exist) or (int(protobuf_version[:1]) < 3):
     raise PleaseInstallProtobufVersion3()
 
-from pgoapi.pgoapi import PGoApi
-from pgoapi.rpc_api import RpcApi
-from pgoapi.auth import Auth
+from pogo_async.pgoapi import PGoApi
+from pogo_async.rpc_api import RpcApi
+from pogo_async.auth import Auth
 
-logging.getLogger("pgoapi").addHandler(logging.NullHandler())
+logging.getLogger("pogo_async").addHandler(logging.NullHandler())
 logging.getLogger("rpc_api").addHandler(logging.NullHandler())
 logging.getLogger("utilities").addHandler(logging.NullHandler())
 logging.getLogger("auth").addHandler(logging.NullHandler())
 logging.getLogger("auth_ptc").addHandler(logging.NullHandler())
 logging.getLogger("auth_google").addHandler(logging.NullHandler())
-
-try:
-    import requests.packages.urllib3
-    requests.packages.urllib3.disable_warnings()
-except Exception:
-    pass
