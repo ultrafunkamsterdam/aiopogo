@@ -6,6 +6,7 @@ import json
 
 from aiohttp import ClientResponseError
 from asyncio import TimeoutError
+from concurrent.futures import TimeoutError as TimeoutException
 
 from pogo_async.hash_engine import HashEngine
 from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
@@ -68,7 +69,7 @@ class HashServer(HashEngine):
                     response_parsed = await resp.json()
                 except (json.JSONDecodeError, ValueError) as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
-        except (ClientResponseError, TimeoutError) as e:
+        except (ClientResponseError, TimeoutError, TimeoutException) as e:
             raise HashingOfflineException from e
 
         try:

@@ -40,6 +40,7 @@ from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientResponseError
 from asyncio import TimeoutError
+from concurrent.futures import TimeoutError as TimeoutException
 
 from importlib import import_module
 
@@ -151,7 +152,7 @@ class RpcApi:
                 content = await resp.read()
                 if not content:
                     raise MalformedNianticResponseException('Empty server response!')
-        except (ClientResponseError, TimeoutError) as e:
+        except (ClientResponseError, TimeoutError, TimeoutException) as e:
             raise NianticOfflineException from e
 
         return content

@@ -11,7 +11,7 @@ class Session:
             return session
         except AttributeError:
             loop = get_event_loop()
-            connector = TCPConnector(limit=150, loop=loop)
+            connector = TCPConnector(limit=250, loop=loop)
             cls._session = ClientSession(connector=connector,
                                          loop=loop,
                                          headers={'User-Agent': 'Niantic App'})
