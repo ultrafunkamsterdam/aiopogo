@@ -38,9 +38,13 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientResponseError
+from aiohttp import ClientResponseError, ProxyConnectionError
 from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutException
+try:
+    from aiosocks import SocksError
+except ModuleNotFoundError:
+    pass
 
 from importlib import import_module
 
@@ -75,7 +79,12 @@ class RpcApi:
         self._hash_engine = None
         self._api_version = "0_45"
         self.request_proto = None
-        self.proxy = proxy
+        if proxy and proxy.startswith('socks'):
+            self._session = Session.get(proxy)
+            self.proxy = None
+        else:
+            self._session = Session.get()
+            self.proxy = proxy
 
         if RpcApi.START_TIME == 0:
             RpcApi.START_TIME = get_time(ms=True)
@@ -86,7 +95,6 @@ class RpcApi:
         self.course = random.uniform(0, 360)
 
         self.device_info = device_info
-        self._session = Session.get()
 
     def activate_signature(self, signature_lib_path):
         self._signature_gen = True
@@ -152,6 +160,8 @@ class RpcApi:
                 content = await resp.read()
                 if not content:
                     raise MalformedNianticResponseException('Empty server response!')
+        except (ProxyConnectionError, SocksError) as e:
+            raise ProxyConnectionError from e
         except (ClientResponseError, TimeoutError, TimeoutException) as e:
             raise NianticOfflineException from e
 

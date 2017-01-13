@@ -33,10 +33,15 @@ import logging
 
 from urllib.parse import parse_qs
 from six import string_types
-from aiohttp import TCPConnector, ClientSession, ClientResponseError
+from aiohttp import TCPConnector, ClientSession, ClientResponseError, ProxyConnectionError
 from asyncio import get_event_loop, TimeoutError
 from concurrent.futures import TimeoutError as TimeoutException
+try:
+    from aiosocks import SocksError
+except ModuleNotFoundError:
+    pass
 
+from pogo_async.session import proxy_connector
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
 from pogo_async.exceptions import AuthException, InvalidCredentialsException
@@ -53,16 +58,23 @@ class AuthPtc(Auth):
         Auth.__init__(self)
 
         self._auth_provider = 'ptc'
-        self.proxy = proxy
         self._session = None
-
-    def set_proxy(self, proxy_config):
-        self.proxy = proxy_config
+        if proxy and proxy.startswith('socks'):
+            self.socks_proxy = proxy
+            self.proxy = None
+        else:
+            self.socks_proxy = None
+            self.proxy = proxy
 
     def session_start(self):
         if self._session and not self._session.closed:
             return
-        self._session = ClientSession(loop=self.loop,
+        if self.socks_proxy:
+            conn = proxy_connector(self.socks_proxy, loop=self.loop)
+        else:
+            conn = None
+        self._session = ClientSession(connector=conn,
+                                      loop=self.loop,
                                       headers={'User-Agent': 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'})
 
     def session_close(self):
@@ -86,6 +98,8 @@ class AuthPtc(Auth):
                 raise AuthException('Caught ConnectionError.') from e
             except json.JSONDecodeError as e:
                 raise AuthException('Unable to parse response') from e
+            except (ProxyConnectionError, SocksError) as e:
+                raise ProxyConnectionError from e
 
             try:
                 data = {
@@ -102,6 +116,8 @@ class AuthPtc(Auth):
             try:
                 async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
                     ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
+            except (ProxyConnectionError, SocksError) as e:
+                raise ProxyConnectionError from e
             except Exception as e:
                 raise AuthException('Could not retrieve token!') from e
 
@@ -143,6 +159,8 @@ class AuthPtc(Auth):
                     async with self._session.post(self.PTC_LOGIN_OAUTH, data=data1, proxy=self.proxy) as r2:
                         qs = await r2.text()
                     token_data = parse_qs(qs)
+                except (ProxyConnectionError, SocksError) as e:
+                    raise ProxyConnectionError from e
                 except Exception as e:
                     raise AuthException('Could not retrieve qs!') from e
 
