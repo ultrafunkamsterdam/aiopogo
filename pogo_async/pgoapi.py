@@ -194,7 +194,7 @@ class PGoApiRequest:
                 """
                 try:
                     self.log.info('Access Token rejected! Requesting new one...')
-                    self._auth_provider.get_access_token(force_refresh=True)
+                    await self._auth_provider.get_access_token(force_refresh=True)
                 except Exception:
                     error = 'Request for new Access Token failed! Logged out...'
                     self.log.error(error)
