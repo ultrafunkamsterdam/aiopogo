@@ -49,11 +49,11 @@ class AuthPtc(Auth):
     PTC_LOGIN_CLIENT_SECRET = 'w8ScCUXJQc6kXKw8FiOhd8Fixzht18Dq3PEVkUCP5ZPxtgyWsbTvWHFLm2wNY0JR'
     loop = get_event_loop()
 
-    def __init__(self):
+    def __init__(self, proxy=None):
         Auth.__init__(self)
 
         self._auth_provider = 'ptc'
-        self.proxy = None
+        self.proxy = proxy
         self._session = None
 
     def set_proxy(self, proxy_config):

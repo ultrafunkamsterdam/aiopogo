@@ -39,12 +39,12 @@ class AuthGoogle(Auth):
     GOOGLE_LOGIN_APP = 'com.nianticlabs.pokemongo'
     GOOGLE_LOGIN_CLIENT_SIG = '321187995bc7cdc2b5fc91b11a96e2baa8602c62'
 
-    def __init__(self):
+    def __init__(self, proxy=None):
         Auth.__init__(self)
 
         self._auth_provider = 'google'
         self._refresh_token = None
-        self._proxy = None
+        self._proxy = proxy
 
     def set_proxy(self, proxy_config):
         self._proxy = proxy_config

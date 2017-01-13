@@ -68,18 +68,15 @@ class PGoApi:
 
     async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None):
         if provider == 'ptc':
-            self._auth_provider = AuthPtc()
+            self._auth_provider = AuthPtc(proxy=proxy_config or self.proxy)
         elif provider == 'google':
-            self._auth_provider = AuthGoogle()
+            self._auth_provider = AuthGoogle(proxy=proxy_config)
         elif provider is None:
             self._auth_provider = None
         else:
             raise InvalidCredentialsException("Invalid authentication provider - only ptc/google available.")
 
         self.log.debug('Auth provider: %s', provider)
-
-        if proxy_config:
-            self._auth_provider.set_proxy(proxy_config)
 
         if oauth2_refresh_token is not None:
             self._auth_provider.set_refresh_token(oauth2_refresh_token)
