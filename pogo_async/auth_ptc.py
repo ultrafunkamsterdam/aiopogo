@@ -35,6 +35,7 @@ from urllib.parse import parse_qs
 from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientResponseError
 from asyncio import get_event_loop, TimeoutError
+from concurrent.futures import TimeoutError as TimeoutException
 
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
@@ -77,9 +78,9 @@ class AuthPtc(Auth):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
         try:
-            async with self._session.get(self.PTC_LOGIN_URL, timeout=30, proxy=self.proxy) as resp:
+            async with self._session.get(self.PTC_LOGIN_URL, timeout=60, proxy=self.proxy) as resp:
                 jdata = await resp.json()
-        except TimeoutError as e:
+        except (TimeoutError, TimeoutException) as e:
             raise AuthException('Request timed out.') from e
         except ClientResponseError as e:
             raise AuthException('Caught ConnectionError.') from e

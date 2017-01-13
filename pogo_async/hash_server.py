@@ -41,7 +41,7 @@ class HashServer(HashEngine):
         # request hashes from hashing server
 
         try:
-            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=30) as resp:
+            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=60) as resp:
                 if resp.status == 400:
                     text = await resp.text()
                     raise BadHashRequestException("400: Bad request, error: {}".format(text))

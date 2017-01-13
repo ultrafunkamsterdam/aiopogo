@@ -137,7 +137,7 @@ class RpcApi:
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, timeout=30, proxy=self.proxy) as resp:
+            async with self._session.post(endpoint, data=request_proto_serialized, timeout=60, proxy=self.proxy) as resp:
                 if resp.status == 400:
                     raise BadRequestException("400: Bad Request")
                 if resp.status == 403:
