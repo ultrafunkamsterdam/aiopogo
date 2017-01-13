@@ -73,43 +73,45 @@ class AuthPtc(Auth):
     async def user_login(self, username, password):
         self.log.info('PTC User Login for: {}'.format(username))
         self.session_start()
-
-        if not isinstance(username, string_types) or not isinstance(password, string_types):
-            raise InvalidCredentialsException("Username/password not correctly specified")
-
         try:
-            async with self._session.get(self.PTC_LOGIN_URL, timeout=60, proxy=self.proxy) as resp:
-                jdata = await resp.json()
-        except (TimeoutError, TimeoutException) as e:
-            raise AuthException('Request timed out.') from e
-        except ClientResponseError as e:
-            raise AuthException('Caught ConnectionError.') from e
-        except json.JSONDecodeError as e:
-            raise AuthException('Unable to parse response') from e
+            if not isinstance(username, string_types) or not isinstance(password, string_types):
+                raise InvalidCredentialsException("Username/password not correctly specified")
 
-        try:
-            data = {
-                'lt': jdata['lt'],
-                'execution': jdata['execution'],
-                '_eventId': 'submit',
-                'username': username,
-                'password': password,
-            }
-        except (ValueError, KeyError) as e:
-            raise AuthException('PTC User Login Error - Field missing in response.') from e
+            try:
+                async with self._session.get(self.PTC_LOGIN_URL, timeout=60, proxy=self.proxy) as resp:
+                    jdata = await resp.json()
+            except (TimeoutError, TimeoutException) as e:
+                raise AuthException('Request timed out.') from e
+            except ClientResponseError as e:
+                raise AuthException('Caught ConnectionError.') from e
+            except json.JSONDecodeError as e:
+                raise AuthException('Unable to parse response') from e
 
-        ticket = None
-        try:
-            async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
-                ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
-        except Exception as e:
-            raise AuthException('Could not retrieve token!') from e
+            try:
+                data = {
+                    'lt': jdata['lt'],
+                    'execution': jdata['execution'],
+                    '_eventId': 'submit',
+                    'username': username,
+                    'password': password,
+                }
+            except (ValueError, KeyError) as e:
+                raise AuthException('PTC User Login Error - Field missing in response.') from e
 
-        self._refresh_token = ticket
-        self.log.info('PTC User Login successful.')
+            ticket = None
+            try:
+                async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
+                    ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
+            except Exception as e:
+                raise AuthException('Could not retrieve token!') from e
 
-        await self.get_access_token()
-        return self._login
+            self._refresh_token = ticket
+            self.log.info('PTC User Login successful.')
+
+            await self.get_access_token()
+            return self._login
+        finally:
+            self.session_close()
 
     def set_refresh_token(self, refresh_token):
         self.log.info('PTC Refresh Token provided by user')
