@@ -44,7 +44,7 @@ from concurrent.futures import TimeoutError as TimeoutException
 try:
     from aiosocks import SocksError
 except ModuleNotFoundError:
-    pass
+    class SocksError(ProxyConnectionError): pass
 
 from importlib import import_module
 

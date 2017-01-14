@@ -39,7 +39,7 @@ from concurrent.futures import TimeoutError as TimeoutException
 try:
     from aiosocks import SocksError
 except ModuleNotFoundError:
-    pass
+    class SocksError(ProxyConnectionError): pass
 
 from pogo_async.session import proxy_connector
 from pogo_async.auth import Auth
