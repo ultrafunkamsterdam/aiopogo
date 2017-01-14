@@ -70,9 +70,9 @@ class AuthPtc(Auth):
         if self._session and not self._session.closed:
             return
         if self.socks_proxy:
-            conn = proxy_connector(self.socks_proxy, loop=self.loop)
+            conn = proxy_connector(self.socks_proxy, loop=self.loop, verify_ssl=False)
         else:
-            conn = None
+            conn = TCPConnector(loop=self.loop, verify_ssl=False)
         self._session = ClientSession(connector=conn,
                                       loop=self.loop,
                                       headers={'User-Agent': 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'})
