@@ -4,7 +4,7 @@ import ctypes
 import base64
 import json
 
-from aiohttp import ClientResponseError
+from aiohttp import ClientResponseError, ClientOSError
 from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutException
 
@@ -69,8 +69,10 @@ class HashServer(HashEngine):
                     response_parsed = await resp.json()
                 except (json.JSONDecodeError, ValueError) as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
-        except (ClientResponseError, TimeoutError, TimeoutException) as e:
-            raise HashingOfflineException from e
+        except (TimeoutError, TimeoutException) as e:
+            raise HashingOfflineException('Connection timed out.') from e
+        except (ClientResponseError, ClientOSError) as e:
+            raise HashingOfflineException('Caught connection error.') from e
 
         try:
             self.location_auth_hash = ctypes.c_int32(response_parsed['locationAuthHash']).value

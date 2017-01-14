@@ -38,7 +38,7 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientResponseError, ProxyConnectionError
+from aiohttp import ClientResponseError, ClientOSError, ProxyConnectionError
 from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutException
 try:
@@ -162,8 +162,10 @@ class RpcApi:
                     raise MalformedNianticResponseException('Empty server response!')
         except (ProxyConnectionError, SocksError) as e:
             raise ProxyConnectionError from e
-        except (ClientResponseError, TimeoutError, TimeoutException) as e:
-            raise NianticOfflineException from e
+        except (TimeoutError, TimeoutException) as e:
+            raise NianticOfflineException('Connection timed out.') from e
+        except (ClientResponseError, ClientOSError) as e:
+            raise NianticOfflineException('Caught connection error.') from e
 
         return content
 

@@ -33,7 +33,7 @@ import logging
 
 from urllib.parse import parse_qs
 from six import string_types
-from aiohttp import TCPConnector, ClientSession, ClientResponseError, ProxyConnectionError
+from aiohttp import TCPConnector, ClientSession, ClientResponseError, ClientOSError, ProxyConnectionError
 from asyncio import get_event_loop, TimeoutError
 from concurrent.futures import TimeoutError as TimeoutException
 try:
@@ -94,7 +94,7 @@ class AuthPtc(Auth):
                     jdata = await resp.json()
             except (TimeoutError, TimeoutException) as e:
                 raise AuthException('Request timed out.') from e
-            except ClientResponseError as e:
+            except (ClientResponseError, ClientOSError) as e:
                 raise AuthException('Caught ConnectionError.') from e
             except json.JSONDecodeError as e:
                 raise AuthException('Unable to parse response') from e
@@ -116,6 +116,10 @@ class AuthPtc(Auth):
             try:
                 async with self._session.post(self.PTC_LOGIN_URL, data=data, proxy=self.proxy) as r1:
                     ticket = re.sub('.*ticket=', '', r1.history[0].headers['Location'])
+            except (TimeoutError, TimeoutException) as e:
+                raise AuthException('Request timed out.') from e
+            except (ClientResponseError, ClientOSError) as e:
+                raise AuthException('Caught ConnectionError.') from e
             except (ProxyConnectionError, SocksError) as e:
                 raise ProxyConnectionError from e
             except Exception as e:
@@ -159,6 +163,10 @@ class AuthPtc(Auth):
                     async with self._session.post(self.PTC_LOGIN_OAUTH, data=data1, proxy=self.proxy) as r2:
                         qs = await r2.text()
                     token_data = parse_qs(qs)
+                except (TimeoutError, TimeoutException) as e:
+                    raise AuthException('Request timed out.') from e
+                except (ClientResponseError, ClientOSError) as e:
+                    raise AuthException('Caught ConnectionError.') from e
                 except (ProxyConnectionError, SocksError) as e:
                     raise ProxyConnectionError from e
                 except Exception as e:
