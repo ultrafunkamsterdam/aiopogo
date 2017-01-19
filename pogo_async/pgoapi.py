@@ -31,7 +31,7 @@ import time
 
 logging.getLogger('aiohttp.client').setLevel(40)
 
-from . import __title__, __version__, __copyright__
+from . import __title__, __version__
 from pogo_async.rpc_api import RpcApi
 from pogo_async.auth_ptc import AuthPtc
 from pogo_async.auth_google import AuthGoogle
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 class PGoApi:
     def __init__(self, provider=None, position_lat=None, position_lng=None, position_alt=None, proxy_config=None, device_info=None):
         self.set_logger()
-        self.log.info('%s v%s - %s', __title__, __version__, __copyright__)
+        self.log.info('%s v%s - %s', __title__, __version__)
 
         self._auth_provider = None
 
@@ -66,17 +66,15 @@ class PGoApi:
     def set_logger(self, logger=None):
         self.log = logger or logging.getLogger(__name__)
 
-    async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None):
+    async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None, user_agent=None, timeout=None):
         if provider == 'ptc':
-            self._auth_provider = AuthPtc(proxy=proxy_config or self.proxy)
+            self._auth_provider = AuthPtc(proxy=proxy_config or self.proxy, user_agent=user_agent, timeout=timeout)
         elif provider == 'google':
             self._auth_provider = AuthGoogle(proxy=proxy_config)
         elif provider is None:
             self._auth_provider = None
         else:
             raise InvalidCredentialsException("Invalid authentication provider - only ptc/google available.")
-
-        self.log.debug('Auth provider: %s', provider)
 
         if oauth2_refresh_token is not None:
             self._auth_provider.set_refresh_token(oauth2_refresh_token)
@@ -187,7 +185,7 @@ class PGoApiRequest:
 
             try:
                 response = await request.request(self._api_endpoint, self._req_method_list, self.get_position())
-            except AuthTokenExpiredException as e:
+            except AuthTokenExpiredException:
                 """
                 This exception only occures if the OAUTH service provider (google/ptc) didn't send any expiration date
                 so that we are assuming, that the access_token is always valid until the API server states differently.
@@ -195,15 +193,13 @@ class PGoApiRequest:
                 try:
                     self.log.info('Access Token rejected! Requesting new one...')
                     await self._auth_provider.get_access_token(force_refresh=True)
-                except Exception:
-                    error = 'Request for new Access Token failed! Logged out...'
-                    self.log.error(error)
-                    raise NotLoggedInException(error)
+                except Exception as e:
+                    raise NotLoggedInException('Reauthentication failed.') from e
 
                 request.request_proto = None  # reset request and rebuild
                 execute = True  # reexecute the call
             except ServerApiEndpointRedirectException as e:
-                self.log.info('API Endpoint redirect... re-execution of call')
+                self.log.debug('API Endpoint redirect... re-execution of call')
                 new_api_endpoint = e.get_redirected_endpoint()
 
                 self._api_endpoint = parse_api_endpoint(new_api_endpoint)
@@ -212,7 +208,6 @@ class PGoApiRequest:
                 execute = True  # reexecute the call
 
         # cleanup after call execution
-        self.log.info('Cleanup of request!')
         self._req_method_list = []
 
         return response
@@ -236,18 +231,17 @@ class PGoApiRequest:
 
             if '_call_direct' in kwargs:
                 del kwargs['_call_direct']
-                self.log.info('Creating a new direct request...')
+                self.log.debug('Creating a new direct request...')
             elif not self._req_method_list:
-                self.log.info('Creating a new request...')
+                self.log.debug('Creating a new request...')
 
             name = func.upper()
             if kwargs:
                 self._req_method_list.append({RequestType.Value(name): kwargs})
-                self.log.info("Adding '%s' to RPC request including arguments", name)
                 self.log.debug("Arguments of '%s': \n\r%s", name, kwargs)
             else:
                 self._req_method_list.append(RequestType.Value(name))
-                self.log.info("Adding '%s' to RPC request", name)
+                self.log.debug("Adding '%s' to RPC request", name)
 
             return self
 

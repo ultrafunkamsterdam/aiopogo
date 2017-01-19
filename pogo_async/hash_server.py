@@ -4,17 +4,18 @@ import ctypes
 import base64
 import json
 
-from aiohttp import ClientResponseError, ClientOSError
+from aiohttp import ClientError, DisconnectedError
 from asyncio import TimeoutError
-from concurrent.futures import TimeoutError as TimeoutException
+from concurrent.futures import TimeoutError as TimeoutError2
 
 from pogo_async.hash_engine import HashEngine
-from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
+from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
 from pogo_async.session import Session
 
 class HashServer(HashEngine):
     endpoint = "https://pokehash.buddyauth.com/api/v121_2/hash"
     status = {}
+    timeout = 15
 
     def __init__(self, auth_token):
         self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}
@@ -41,7 +42,7 @@ class HashServer(HashEngine):
         # request hashes from hashing server
 
         try:
-            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=60) as resp:
+            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=self.timeout) as resp:
                 if resp.status == 400:
                     text = await resp.text()
                     raise BadHashRequestException("400: Bad request, error: {}".format(text))
@@ -69,10 +70,10 @@ class HashServer(HashEngine):
                     response_parsed = await resp.json()
                 except (json.JSONDecodeError, ValueError) as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
-        except (TimeoutError, TimeoutException) as e:
-            raise HashingOfflineException('Connection timed out.') from e
-        except (ClientResponseError, ClientOSError) as e:
-            raise HashingOfflineException('Caught connection error.') from e
+        except (TimeoutError, TimeoutError2) as e:
+            raise HashingTimeoutException('Hashing request timed out.') from e
+        except (ClientError, DisconnectedError) as e:
+            raise HashingOfflineException('Caught client or disconnected error.') from e
 
         try:
             self.location_auth_hash = ctypes.c_int32(response_parsed['locationAuthHash']).value

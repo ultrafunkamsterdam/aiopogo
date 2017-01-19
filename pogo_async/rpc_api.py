@@ -38,9 +38,9 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientResponseError, ClientOSError, ProxyConnectionError
+from aiohttp import ClientError, DisconnectedError, ProxyConnectionError
 from asyncio import TimeoutError
-from concurrent.futures import TimeoutError as TimeoutException
+from concurrent.futures import TimeoutError as TimeoutError2
 try:
     from aiosocks import SocksError
 except ModuleNotFoundError:
@@ -48,7 +48,7 @@ except ModuleNotFoundError:
 
 from importlib import import_module
 
-from pogo_async.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
+from pogo_async.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NianticTimeoutException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
 from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, Rand48, long_to_bytes, f2i
 from pogo_async.hash_library import HashLibrary
 from pogo_async.hash_engine import HashEngine
@@ -66,6 +66,7 @@ from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb
 class RpcApi:
     RPC_ID = 0
     START_TIME = 0
+    TIMEOUT = 15
 
     def __init__(self, auth_provider, device_info, proxy=None):
 
@@ -145,7 +146,7 @@ class RpcApi:
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, timeout=60, proxy=self.proxy) as resp:
+            async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.TIMEOUT, proxy=self.proxy) as resp:
                 if resp.status == 400:
                     raise BadRequestException("400: Bad Request")
                 if resp.status == 403:
@@ -153,19 +154,17 @@ class RpcApi:
                 elif resp.status in (502, 503, 504):
                     raise NianticOfflineException('{} Server Error'.format(resp.status))
                 elif resp.status != 200:
-                    error = 'Unexpected HTTP server response - needs 200 got {}'.format(resp.status)
-                    self.log.warning(error)
-                    raise UnexpectedResponseException(error)
+                    raise UnexpectedResponseException('Unexpected HTTP server response - needs 200 got {}'.format(resp.status))
 
                 content = await resp.read()
                 if not content:
                     raise MalformedNianticResponseException('Empty server response!')
         except (ProxyConnectionError, SocksError) as e:
             raise ProxyConnectionError from e
-        except (TimeoutError, TimeoutException) as e:
-            raise NianticOfflineException('Connection timed out.') from e
-        except (ClientResponseError, ClientOSError) as e:
-            raise NianticOfflineException('Caught connection error.') from e
+        except (TimeoutError, TimeoutError2) as e:
+            raise NianticTimeoutException('RPC request timed out.') from e
+        except (ClientError, DisconnectedError) as e:
+            raise NianticOfflineException('Caught a client or disconnected error.') from e
 
         return content
 
@@ -412,8 +411,7 @@ class RpcApi:
         try:
             response_proto.ParseFromString(response_raw)
         except message.DecodeError as e:
-            self.log.error('Could not parse response: %s', e)
-            raise MalformedNianticResponseException('Could not parse response.')
+            raise MalformedNianticResponseException('Could not parse response.') from e
 
         self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)
 

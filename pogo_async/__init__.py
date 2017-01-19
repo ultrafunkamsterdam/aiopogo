@@ -31,7 +31,7 @@ import pkg_resources
 import logging
 
 __title__ = 'pogo_async'
-__version__ = '1.0'
+__version__ = '1.1'
 __author__ = 'Noctem'
 __license__ = 'MIT License'
 __copyright__ = 'Copyright (c) 2016 tjado <https://github.com/tejado>'
