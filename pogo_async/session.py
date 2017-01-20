@@ -30,7 +30,7 @@ class Session:
         if proxy in cls.sessions:
             return cls.sessions[proxy]
         if proxy:
-            conn = proxy_connector(proxy, loop=cls.loop, verify_ssl=False)
+            conn = proxy_connector(proxy, loop=cls.loop)
         else:
             conn = TCPConnector(limit=250, loop=cls.loop, verify_ssl=False)
         cls.sessions[proxy] = ClientSession(connector=conn,
