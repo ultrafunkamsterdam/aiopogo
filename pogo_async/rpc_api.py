@@ -43,7 +43,7 @@ from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutError2
 try:
     from aiosocks import SocksError
-except ModuleNotFoundError:
+except ImportError:
     class SocksError(ProxyConnectionError): pass
 
 from importlib import import_module

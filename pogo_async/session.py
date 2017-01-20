@@ -4,7 +4,7 @@ from yarl import URL
 try:
     from aiosocks import Socks4Addr, Socks5Addr, Socks5Auth
     from aiosocks.connector import SocksConnector
-except ModuleNotFoundError:
+except ImportError:
     pass
 
 def proxy_connector(proxy, loop=None):
@@ -19,7 +19,7 @@ def proxy_connector(proxy, loop=None):
                 auth = Socks5Auth(proxy.user, proxy.password)
         return SocksConnector(proxy=addr, proxy_auth=auth, limit=250, loop=loop, remote_resolve=False, verify_ssl=False)
     except NameError as e:
-        raise ModuleNotFoundError('Install aiosocks to use socks proxies.') from e
+        raise ImportError('Install aiosocks to use socks proxies.') from e
 
 class Session:
     sessions = {}

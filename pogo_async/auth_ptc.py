@@ -35,7 +35,7 @@ from asyncio import get_event_loop, TimeoutError
 from concurrent.futures import TimeoutError as TimeoutError2
 try:
     from aiosocks import SocksError
-except ModuleNotFoundError:
+except ImportError:
     class SocksError(ProxyConnectionError): pass
 
 from pogo_async.session import proxy_connector
@@ -72,7 +72,7 @@ class AuthPtc(Auth):
         if self._session and not self._session.closed:
             return
         if self.socks_proxy:
-            conn = proxy_connector(self.socks_proxy, loop=self.loop, verify_ssl=False)
+            conn = proxy_connector(self.socks_proxy, loop=self.loop)
         else:
             conn = TCPConnector(loop=self.loop, verify_ssl=False)
         self._session = ClientSession(connector=conn,
