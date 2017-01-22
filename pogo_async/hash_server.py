@@ -12,6 +12,7 @@ from pogo_async.hash_engine import HashEngine
 from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
 from pogo_async.session import Session
 
+
 class HashServer(HashEngine):
     endpoint = "https://pokehash.buddyauth.com/api/v123_1/hash"
     status = {}
