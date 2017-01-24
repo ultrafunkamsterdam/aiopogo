@@ -18,5 +18,5 @@ setup(name='pogo_async',
       download_url = "https://github.com/Noctem/pgoapi/releases",
       packages = find_packages(),
       install_requires = reqs,
-      package_data={'pogo_async': ['lib_0_45/*', 'lib_0_51/*']}
+      package_data={'pgoapi': ['lib/*']}
       )
