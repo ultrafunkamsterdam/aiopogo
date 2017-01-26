@@ -16,7 +16,7 @@ from pogo_async.session import Session
 class HashServer(HashEngine):
     endpoint = "https://pokehash.buddyauth.com/api/v123_1/hash"
     status = {}
-    timeout = 15
+    timeout = 10
 
     def __init__(self, auth_token):
         self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}
