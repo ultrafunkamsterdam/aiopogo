@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Noctem/pgoapi.svg?branch=async)](https://travis-ci.org/Noctem/pgoapi)
+
 # pgoapi - a pokemon go api lib in python
 pgoapi is a client/api/demo for Pokemon Go by https://github.com/tejado.  
 It allows automatic parsing of requests/responses by finding the correct protobuf objects over a naming convention and will return the response in a parsed python dictionary format.   
