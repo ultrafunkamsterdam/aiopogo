@@ -1,9 +1,9 @@
 from __future__ import absolute_import
 
-import ctypes
-import base64
 import json
 
+from ctypes import c_int32, c_int64
+from base64 import b64encode
 from aiohttp import ClientError, DisconnectedError
 from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutError2
@@ -33,11 +33,11 @@ class HashServer(HashEngine):
         payload["Latitude"] = latitude
         payload["Longitude"] = longitude
         payload["Altitude"] = altitude
-        payload["AuthTicket"] = base64.b64encode(authticket)
-        payload["SessionData"] = base64.b64encode(sessiondata)
+        payload["AuthTicket"] = b64encode(authticket)
+        payload["SessionData"] = b64encode(sessiondata)
         payload["Requests"] = []
         for request in requestslist:
-            payload["Requests"].append(base64.b64encode(request.SerializeToString()))
+            payload["Requests"].append(b64encode(request.SerializeToString()))
 
         payload = json.dumps(payload, cls=JSONByteEncoder)
 
@@ -61,10 +61,10 @@ class HashServer(HashEngine):
 
                 headers = resp.headers
                 try:
-                    self.status['period'] = int(headers.get('X-RatePeriodEnd'))
-                    self.status['remaining'] = int(headers.get('X-RateRequestsRemaining'))
-                    self.status['maximum'] = int(headers.get('X-MaxRequestCount'))
-                except TypeError:
+                    self.status['remaining'] = int(headers['X-RateRequestsRemaining'])
+                    self.status['period'] = int(headers['X-RatePeriodEnd'])
+                    self.status['maximum'] = int(headers['X-MaxRequestCount'])
+                except (KeyError, TypeError, ValueError):
                     pass
 
                 try:
@@ -77,10 +77,10 @@ class HashServer(HashEngine):
             raise HashingOfflineException('Caught client or disconnected error.') from e
 
         try:
-            self.location_auth_hash = ctypes.c_int32(response_parsed['locationAuthHash']).value
-            self.location_hash = ctypes.c_int32(response_parsed['locationHash']).value
+            self.location_auth_hash = c_int32(response_parsed['locationAuthHash']).value
+            self.location_hash = c_int32(response_parsed['locationHash']).value
 
             for request_hash in response_parsed['requestHashes']:
-                self.request_hashes.append(ctypes.c_int64(request_hash).value)
+                self.request_hashes.append(c_int64(request_hash).value)
         except Exception as e:
             raise MalformedHashResponseException('Unable to load values') from e
