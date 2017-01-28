@@ -8,9 +8,10 @@ from aiohttp import ClientError, DisconnectedError
 from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutError2
 
-from pogo_async.hash_engine import HashEngine
-from pogo_async.exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
-from pogo_async.session import Session
+from .hash_engine import HashEngine
+from .exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
+from .session import Session
+from .utilities import JSONByteEncoder
 
 
 class HashServer(HashEngine):
@@ -32,16 +33,15 @@ class HashServer(HashEngine):
         payload["Latitude"] = latitude
         payload["Longitude"] = longitude
         payload["Altitude"] = altitude
-        payload["AuthTicket"] = base64.b64encode(authticket).decode('ascii')
-        payload["SessionData"] = base64.b64encode(sessiondata).decode('ascii')
+        payload["AuthTicket"] = base64.b64encode(authticket)
+        payload["SessionData"] = base64.b64encode(sessiondata)
         payload["Requests"] = []
         for request in requestslist:
-            payload["Requests"].append(base64.b64encode(request.SerializeToString()).decode('ascii'))
+            payload["Requests"].append(base64.b64encode(request.SerializeToString()))
 
-        payload = json.dumps(payload)
+        payload = json.dumps(payload, cls=JSONByteEncoder)
 
         # request hashes from hashing server
-
         try:
             async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=self.timeout) as resp:
                 if resp.status == 400:

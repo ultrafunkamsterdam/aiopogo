@@ -61,7 +61,7 @@ def to_camel_case(value):
 # JSON Encoder to handle bytes
 class JSONByteEncoder(JSONEncoder):
     def default(self, o):
-        return o.decode('utf-8')
+        return o.decode('ascii')
 
 
 def get_pos_by_name(location_name):
