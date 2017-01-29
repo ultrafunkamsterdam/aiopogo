@@ -49,7 +49,7 @@ except ImportError:
 from importlib import import_module
 
 from pogo_async.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NianticTimeoutException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
-from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, Rand48, long_to_bytes, f2i
+from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
 from pogo_async.hash_library import HashLibrary
 from pogo_async.hash_engine import HashEngine
 from pogo_async.hash_server import HashServer
@@ -65,21 +65,20 @@ from pogoprotos.networking.platform.requests.plat_eight_pb2 import PlatEight
 
 
 class RpcApi:
-    RPC_ID = 0
-    START_TIME = 0
     TIMEOUT = 15
+    signature_lib_path, hash_lib_path = get_lib_paths()
+    _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
+    log = logging.getLogger(__name__)
 
-    def __init__(self, auth_provider, device_info, proxy=None):
-
-        self.log = logging.getLogger(__name__)
-
+    def __init__(self, auth_provider, device_info, state, proxy=None):
         self._auth_provider = auth_provider
+        self.state = state
 
         # mystical unknown6 - resolved by PokemonGoDev
-        self._signature_gen = False
+        self._signature_gen = True
         self._signature_lib = None
         self._hash_engine = None
-        self._api_version = "0_45"
+        self._api_version = 0.45
         self._encrypt_version = 2
         self.request_proto = None
         if proxy and proxy.startswith('socks'):
@@ -89,46 +88,21 @@ class RpcApi:
             self._session = Session.get()
             self.proxy = proxy
 
-        if RpcApi.START_TIME == 0:
-            RpcApi.START_TIME = get_time(ms=True)
-
         # data fields for SignalAgglom
-        self.session_hash = os.urandom(16)
         self.token2 = random.randint(1, 59)
-        self.course = random.uniform(0, 360)
 
         self.device_info = device_info
 
-    def activate_signature(self, signature_lib_path):
-        self._signature_gen = True
-        self._signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
-
-    def activate_hash_library(self, hash_lib_path):
-        self._hash_engine = HashLibrary(hash_lib_path)
+    def activate_hash_library(self):
+        self._hash_engine = HashLibrary(self.hash_lib_path)
 
     def activate_hash_server(self, auth_token):
         self._hash_engine = HashServer(auth_token)
 
     def set_api_version(self, api_version):
         self._api_version = api_version
-        if api_version != '0_45':
+        if api_version > 0.45:
             self._encrypt_version = 3
-
-    def get_rpc_id(self):
-        if RpcApi.RPC_ID==0 :  #Startup
-            RpcApi.RPC_ID=1
-            if (self.device_info and
-                    self.device_info.get('brand', 'Apple') != 'Apple'):
-                rand = 0x53B77E48
-            else:
-                rand = 0x000041A7
-        else:
-            rand = random.randint(0, 2**31)
-        RpcApi.RPC_ID += 1
-        request_id = ((rand | ((RpcApi.RPC_ID & 0xFFFFFFFF) >> 31)) << 32) | RpcApi.RPC_ID
-        self.log.debug("Incremented RPC Request ID: %s", request_id)
-
-        return request_id
 
     def decode_raw(self, raw):
         output = error = None
@@ -175,7 +149,7 @@ class RpcApi:
     async def request(self, endpoint, subrequests, player_position):
 
         if not self._auth_provider or self._auth_provider.is_login() is False:
-            raise NotLoggedInException()
+            raise NotLoggedInException
 
         self.request_proto = self.request_proto or await self._build_main_request(subrequests, player_position)
 
@@ -227,7 +201,7 @@ class RpcApi:
         request = RequestEnvelope()
         request.status_code = 2
 
-        request.request_id = self.get_rpc_id()
+        request.request_id = self.state.request_id()
         request.accuracy = random.choice((5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66, 80)))
 
         if player_position:
@@ -241,7 +215,6 @@ class RpcApi:
             self.log.debug('Found Session Ticket - using this instead of oauth token')
             request.auth_ticket.expire_timestamp_ms, request.auth_ticket.start, request.auth_ticket.end = ticket
             ticket_serialized = request.auth_ticket.SerializeToString()
-
         else:
             self.log.debug('No Session Ticket found - using OAUTH Access Token')
             request.auth_info.provider = self._auth_provider.get_name()
@@ -252,9 +225,9 @@ class RpcApi:
         if self._signature_gen:
             sig = SignalLog()
 
-            sig.field22 = self.session_hash
+            sig.field22 = self.state.session_hash
             sig.epoch_timestamp_ms = get_time(ms=True)
-            sig.timestamp_ms_since_start = get_time(ms=True) - RpcApi.START_TIME
+            sig.timestamp_ms_since_start = get_time(ms=True) - self.state.start_time
             if sig.timestamp_ms_since_start < 5000:
                 sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
@@ -281,8 +254,7 @@ class RpcApi:
                 loc.device_course = -1
                 loc.device_speed = -1
             else:
-                self.course = random.triangular(0, 360, self.course)
-                loc.device_course = self.course
+                loc.device_course = self.state.get_course()
                 loc.device_speed = random.triangular(0.2, 4.25, 1)
 
             loc.provider_status = 3
@@ -315,9 +287,9 @@ class RpcApi:
             sen.gravity_z = random.triangular(-1, .7, -0.7)
             sen.status = 3
 
-            if self._api_version == "0_45":
+            if self._api_version == 0.45:
                 sig.version_hash = -1553869577012279119
-            elif self._api_version == "0_53":
+            elif self._api_version == 0.53:
                 sig.version_hash = -76506539888958491
 
             if self.device_info:
@@ -487,3 +459,21 @@ class RpcApi:
             i += 1
 
         return response_proto_dict
+
+
+class RpcState:
+    def __init__(self):
+        self.start_time = get_time(ms=True)
+        self.request = 1
+        self.rand = Rand()
+        self.session_hash = os.urandom(16)
+        self.course = random.uniform(0, 359.9)
+
+    def request_id(self):
+        self.request += 1
+        r = self.rand.next()
+        return (r << 32) | self.request
+
+    def get_course(self):
+        self.course = random.triangular(0, 359.9, self.course)
+        return self.course

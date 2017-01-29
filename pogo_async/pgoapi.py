@@ -32,10 +32,10 @@ import time
 logging.getLogger('aiohttp.client').setLevel(40)
 
 from . import __title__, __version__
-from pogo_async.rpc_api import RpcApi
+from pogo_async.rpc_api import RpcApi, RpcState
 from pogo_async.auth_ptc import AuthPtc
 from pogo_async.auth_google import AuthGoogle
-from pogo_async.utilities import parse_api_endpoint, get_lib_paths, get_time
+from pogo_async.utilities import parse_api_endpoint, get_time
 from pogo_async.exceptions import AuthException, AuthTokenExpiredException, BadRequestException, BannedAccountException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException, ServerBusyOrOfflineException, UnexpectedResponseException
 
 from . import protos
@@ -50,6 +50,7 @@ class PGoApi:
         self.log.info('%s v%s - %s', __title__, __version__)
 
         self._auth_provider = None
+        self._state = RpcState()
 
         self.set_api_endpoint("pgorelease.nianticlabs.com/plfe")
 
@@ -58,9 +59,7 @@ class PGoApi:
         self._position_alt = position_alt
 
         self._hash_server_token = None
-
         self.proxy = proxy_config
-
         self.device_info = device_info
 
     def set_logger(self, logger=None):
@@ -109,9 +108,13 @@ class PGoApi:
     def get_auth_provider(self):
         return self._auth_provider
 
+    def get_state(self):
+        return self._state
+
     def create_request(self):
         request = PGoApiRequest(self, self._position_lat, self._position_lng,
-                                self._position_alt, self.device_info, self.proxy)
+                                self._position_alt, self.device_info, self.proxy,
+                                self._hash_server_token)
         return request
 
     def activate_hash_server(self, hash_server_token):
@@ -133,58 +136,47 @@ class PGoApi:
 
 
 class PGoApiRequest:
-
     def __init__(self, parent, position_lat, position_lng, position_alt,
-                 device_info=None, proxy_config=None):
+                 device_info=None, proxy_config=None, hash_token=None):
         self.log = logging.getLogger(__name__)
 
         self.__parent__ = parent
 
-        """ Inherit necessary parameters from parent """
+        # Inherit necessary parameters from parent
         self._api_endpoint = self.__parent__.get_api_endpoint()
         self._auth_provider = self.__parent__.get_auth_provider()
+        self._state = self.__parent__.get_state()
 
-        self._position_lat = position_lat
-        self._position_lng = position_lng
-        self._position_alt = position_alt
+        self._position = (position_lat, position_lng, position_alt)
 
         self._req_method_list = []
         self.device_info = device_info
         self.proxy = proxy_config
+        self.hash_token = hash_token
 
     async def call(self):
-        if (self._position_lat is None) or (self._position_lng is None):
+        if self._position[0] is None or self._position[1] is None:
             raise NoPlayerPositionSetException
 
         if self._auth_provider is None or not self._auth_provider.is_login():
             self.log.info('Not logged in')
             raise NotLoggedInException
 
-        request = RpcApi(self._auth_provider, self.device_info, proxy=self.proxy)
+        request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)
 
-        hash_server_token = self.__parent__.get_hash_server_token()
-        if hash_server_token:
-            version = "0_53"
-            request.set_api_version(version)
-            request.activate_hash_server(hash_server_token)
+        if self.hash_token:
+            request.set_api_version(0.53)
+            request.activate_hash_server(self.hash_token)
         else:
-            version = "0_45"
-
-        default_libraries = get_lib_paths(version)
-        signature_lib_path, hash_lib_path = default_libraries
-        request.activate_signature(signature_lib_path)
-
-        if hash_lib_path:
-            request.activate_hash_library(hash_lib_path)
+            request.activate_hash_library()
 
         response = None
-
         execute = True
         while execute:
             execute = False
 
             try:
-                response = await request.request(self._api_endpoint, self._req_method_list, self.get_position())
+                response = await request.request(self._api_endpoint, self._req_method_list, self._position)
             except AuthTokenExpiredException:
                 """
                 This exception only occures if the OAUTH service provider (google/ptc) didn't send any expiration date
@@ -215,16 +207,6 @@ class PGoApiRequest:
     def list_curr_methods(self):
         for i in self._req_method_list:
             print("{} ({})".format(RequestType.Name(i), i))
-
-    def get_position(self):
-        return (self._position_lat, self._position_lng, self._position_alt)
-
-    def set_position(self, lat, lng, alt=None):
-        self.log.debug('Set Position - Lat: %s Long: %s Alt: %s', lat, lng, alt)
-
-        self._position_lat = lat
-        self._position_lng = lng
-        self._position_alt = alt
 
     def __getattr__(self, func):
         def function(**kwargs):

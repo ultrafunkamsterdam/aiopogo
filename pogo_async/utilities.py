@@ -32,11 +32,12 @@ from binascii import unhexlify
 # other stuff
 from google.protobuf.internal import encoder
 from geopy.geocoders import GoogleV3
-from s2sphere import LatLng, Angle, Cap, RegionCoverer, math
+from s2sphere import LatLng, Angle, Cap, RegionCoverer
+from math import pi
 
 log = logging.getLogger(__name__)
 
-EARTH_RADIUS = 6371000  # radius of Earth in meters
+EARTH_RADIUS = 6371009  # radius of Earth in meters
 
 def f2i(float):
   return struct.unpack('<Q', struct.pack('<d', float))[0]
@@ -49,10 +50,12 @@ def f2h(float):
 def h2f(hex):
   return struct.unpack('<d', struct.pack('<Q', int(hex,16)))[0]
 
+
 def d2h(f):
     hex_str = f2h(f)[2:].replace('L','')
     hex_str = ("0" * (len(hex_str) % 2)) + hex_str
     return unhexlify(hex_str)
+
 
 def to_camel_case(value):
   return ''.join(word.capitalize() if word else '_' for word in value.split('_'))
@@ -76,12 +79,12 @@ def get_pos_by_name(location_name):
     return (loc.latitude, loc.longitude, loc.altitude)
 
 
-def get_cell_ids(lat, long, radius=500):
+def get_cell_ids(lat, lon, radius=500):
     # Max values allowed by server according to this comment:
     # https://github.com/AeonLucid/POGOProtos/issues/83#issuecomment-235612285
     if radius > 1500:
         radius = 1500  # radius = 1500 is max allowed by the server
-    region = Cap.from_axis_angle(LatLng.from_degrees(lat, long).to_point(), Angle.from_degrees(360*radius/(2*math.pi*EARTH_RADIUS)))
+    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), Angle.from_degrees(360*radius/(2 * pi *EARTH_RADIUS)))
     coverer = RegionCoverer()
     coverer.min_level = 15
     coverer.max_level = 15
@@ -115,25 +118,25 @@ def parse_api_endpoint(api_url):
     return api_url
 
 
-class Rand48(object):
-    def __init__(self, seed):
-        self.n = seed
-    def seed(self, seed):
-        self.n = seed
-    def srand(self, seed):
-        self.n = (seed << 16) + 0x330e
+class Rand:
+    '''Lehmer random number generator'''
+    M = 0x7fffffff  # 2^31 - 1 (A large prime number)
+    A = 16807       # Prime root of M
+    Q = 127773      # M // A (To avoid overflow on A * seed)
+    R = 2836        # M % A (To avoid overflow on A * seed)
+
+    def __init__(self, seed=1):
+        self.seed = seed
+        self.request = 1
+
     def next(self):
-        self.n = (25214903917 * self.n + 11) & (2**48 - 1)
-        return self.n
-    def drand(self):
-        return self.next() / 2**48
-    def lrand(self):
-        return self.next() >> 17
-    def mrand(self):
-        n = self.next() >> 16
-        if n & (1 << 31):
-            n -= 1 << 32
-        return n
+        hi = self.seed // self.Q
+        lo = self.seed % self.Q
+        t = self.A * lo - self.R * hi
+        if t < 0:
+            t += self.M
+        self.seed = t % 0x80000000
+        return self.seed
 
 
 def long_to_bytes(val, endianness='big'):
@@ -166,18 +169,19 @@ def long_to_bytes(val, endianness='big'):
 
     return s
 
-def get_lib_paths(api_version):
-    # win32 doesn't mean necessarily 32 bits
-    hash_lib = None
+
+def get_lib_paths():
+    # win32 doesn't necessarily mean 32 bits
     arch = platform.architecture()[0]
-    if sys.platform == "win32" or sys.platform == "cygwin":
+    plat = sys.platform
+    if plat in ('win32', 'cygwin'):
         if arch == '64bit':
             encrypt_lib = "libpcrypt-windows-x86-64.dll"
             hash_lib = "libniahash-windows-x86-64.dll"
         else:
             encrypt_lib = "libpcrypt-windows-i686.dll"
             hash_lib = "libniahash-windows-i686.dll"
-    elif sys.platform == "darwin":
+    elif plat == "darwin":
         if arch == '64bit':
             encrypt_lib = "libpcrypt-macos-x86-64.dylib"
             hash_lib = "libniahash-macos-x86-64.dylib"
@@ -187,17 +191,17 @@ def get_lib_paths(api_version):
     elif os.uname()[4].startswith("arm") and arch == '32bit':
         encrypt_lib = "libpcrypt-linux-arm32.so"
         hash_lib = "libniahash-linux-arm32.so"
-    elif os.uname()[4].startswith("aarch64") and arch == '64bit':
+    elif os.uname()[4].startswith("aarch64"):
         encrypt_lib = "libpcrypt-linux-arm64.so"
         hash_lib = "libniahash-linux-arm64.so"
-    elif sys.platform.startswith('linux'):
+    elif plat.startswith('linux'):
         if arch == '64bit':
             encrypt_lib = "libpcrypt-linux-x86-64.so"
             hash_lib = "libniahash-linux-x86-64.so"
         else:
             encrypt_lib = "libpcrypt-linux-i386.so"
             hash_lib = "libniahash-linux-i386.so"
-    elif sys.platform.startswith('freebsd'):
+    elif plat.startswith('freebsd'):
         if arch == '64bit':
             encrypt_lib = "libpcrypt-freebsd-x86-64.so"
             hash_lib = "libniahash-freebsd-x86-64.so"
@@ -205,25 +209,21 @@ def get_lib_paths(api_version):
             encrypt_lib = "libpcrypt-freebsd-i386.so"
             hash_lib = "libniahash-freebsd-i386.so"
     else:
-        err = "Unexpected/unsupported platform '{}'".format(sys.platform)
+        err = "Unexpected/unsupported platform: {}".format(plat)
         log.error(err)
-        raise Exception(err)
+        raise NotImplementedError(err)
 
     encrypt_lib_path = os.path.join(os.path.dirname(__file__), "lib", encrypt_lib)
-
-    if api_version == "0_45":
-        hash_lib_path = os.path.join(os.path.dirname(__file__), "lib", hash_lib)
-
-        if not os.path.isfile(hash_lib_path):
-            err = "Could not find {} hashing library {}".format(sys.platform, hash_lib_path)
-            log.error(err)
-            raise Exception(err)
-    else:
-        hash_lib_path = None
+    hash_lib_path = os.path.join(os.path.dirname(__file__), "lib", hash_lib)
 
     if not os.path.isfile(encrypt_lib_path):
-        err = "Could not find {} encryption library {}".format(sys.platform, encrypt_lib_path)
+        err = "Could not find {} encryption library {}".format(plat, encrypt_lib_path)
         log.error(err)
-        raise Exception(err)
+        raise OSError(err)
+
+    if not os.path.isfile(hash_lib_path):
+        err = "Could not find {} hashing library {}".format(plat, hash_lib_path)
+        log.error(err)
+        raise OSError(err)
 
     return encrypt_lib_path, hash_lib_path
