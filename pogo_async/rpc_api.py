@@ -76,7 +76,6 @@ class RpcApi:
 
         # mystical unknown6 - resolved by PokemonGoDev
         self._signature_gen = True
-        self._signature_lib = None
         self._hash_engine = None
         self._api_version = 0.45
         self._encrypt_version = 2
