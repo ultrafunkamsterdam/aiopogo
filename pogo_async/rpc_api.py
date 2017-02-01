@@ -61,7 +61,7 @@ from pogoprotos.networking.envelopes.response_envelope_pb2 import ResponseEnvelo
 from pogoprotos.networking.requests.request_type_pb2 import RequestType
 from pogoprotos.networking.envelopes.signal_log_pb2 import SignalLog
 from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
-from pogoprotos.networking.platform.requests.plat_eight_pb2 import PlatEight
+from pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 
 
 class RpcApi:
@@ -301,7 +301,7 @@ class RpcApi:
 
             try:
                 if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
-                    plat_eight = PlatEight()
+                    plat_eight = PlatEightRequest()
                     plat_eight.field1 = 'e40c3e64817d9c96d99d28f6488a2efc40b11046'
                     plat8 = request.platform_requests.add()
                     plat8.type = 8
