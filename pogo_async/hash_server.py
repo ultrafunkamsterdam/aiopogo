@@ -15,7 +15,7 @@ from .utilities import JSONByteEncoder
 
 
 class HashServer(HashEngine):
-    endpoint = "https://pokehash.buddyauth.com/api/v123_1/hash"
+    endpoint = "https://pokehash.buddyauth.com/api/v125/hash"
     status = {}
     timeout = 10
 

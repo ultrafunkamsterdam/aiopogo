@@ -288,8 +288,8 @@ class RpcApi:
 
             if self._api_version == 0.45:
                 sig.version_hash = -1553869577012279119
-            elif self._api_version == 0.53:
-                sig.version_hash = -76506539888958491
+            else:
+                sig.version_hash = -9156899491064153954
 
             if self.device_info:
                 for key in self.device_info:
@@ -297,18 +297,17 @@ class RpcApi:
                 if self.device_info.get('brand', 'Apple') == 'Apple':
                     sig.ios_device_info.bool5 = True
 
-            signature_proto = sig.SerializeToString()
-
             try:
                 if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
                     plat_eight = PlatEightRequest()
-                    plat_eight.field1 = 'e40c3e64817d9c96d99d28f6488a2efc40b11046'
+                    plat_eight.field1 = '90f6a704505bccac73cec99b07794993e6fd5a12'
                     plat8 = request.platform_requests.add()
                     plat8.type = 8
                     plat8.request_message = plat_eight.SerializeToString()
             except (IndexError, AttributeError):
                 pass
 
+            signature_proto = sig.SerializeToString()
             sig_request = SendEncryptedSignatureRequest()
             sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_ms_since_start)
             plat = request.platform_requests.add()
