@@ -176,23 +176,24 @@ class RpcApi:
         return response_dict
 
     def check_authentication(self, response_dict):
-        if isinstance(response_dict, dict) and ('auth_ticket' in response_dict) and \
-           ('expire_timestamp_ms' in response_dict['auth_ticket']) and \
-           (self._auth_provider.is_new_ticket(response_dict['auth_ticket']['expire_timestamp_ms'])):
-
-            had_ticket = self._auth_provider.has_ticket()
-
+        try:
             auth_ticket = response_dict['auth_ticket']
-            self._auth_provider.set_ticket(
-                [auth_ticket['expire_timestamp_ms'], auth_ticket['start'], auth_ticket['end']])
+            timestamp = auth_ticket['expire_timestamp_ms']
+            if self._auth_provider.is_new_ticket(timestamp):
+                had_ticket = self._auth_provider.has_ticket()
 
-            now_ms = get_time(ms=True)
-            h, m, s = get_format_time_diff(now_ms, auth_ticket['expire_timestamp_ms'], True)
+                self._auth_provider.set_ticket(
+                    (timestamp, auth_ticket['start'], auth_ticket['end']))
 
-            if had_ticket:
-                self.log.debug('Replacing old Session Ticket with new one valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
-            else:
-                self.log.debug('Received Session Ticket valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
+                now_ms = get_time(ms=True)
+                h, m, s = get_format_time_diff(now_ms, auth_ticket['expire_timestamp_ms'], True)
+
+                if had_ticket:
+                    self.log.debug('Replacing old Session Ticket with new one valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
+                else:
+                    self.log.debug('Received Session Ticket valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
+        except (TypeError, KeyError):
+            return
 
     async def _build_main_request(self, subrequests, player_position=None):
         self.log.debug('Generating main RPC request...')

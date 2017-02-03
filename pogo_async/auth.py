@@ -83,8 +83,6 @@ class Auth:
         if self.has_ticket():
             now_ms = get_time(ms = True)
             if now_ms < (self._ticket_expire - 10000):
-                h, m, s = get_format_time_diff(now_ms, self._ticket_expire, True)
-                self.log.debug('Session Ticket still valid for further %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, self._ticket_expire)
                 return True
             else:
                 self.log.debug('Removed expired Session Ticket (%s < %s)', now_ms, self._ticket_expire)

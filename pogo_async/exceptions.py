@@ -51,7 +51,7 @@ class AuthTokenExpiredException(PgoapiError):
 class BadRequestException(PgoapiError):
     """Raised when HTTP code 400 is returned"""
 
-class BadHashRequestException(BadRequestException):
+class BadHashRequestException(BadRequestException, HashServerException):
     """Raised when hashing server returns code 400"""
 
 

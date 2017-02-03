@@ -149,14 +149,13 @@ class AuthPtc(Auth):
         self._refresh_token = refresh_token
 
     async def get_access_token(self, force_refresh=False):
-        token_validity = self.check_access_token()
-
-        if token_validity is True and force_refresh is False:
+        if force_refresh is False and self.check_access_token():
             self.log.debug('Using cached PTC Access Token')
             return self._access_token
         else:
             self.session_start()
             try:
+                self._login = False
                 if force_refresh:
                     self.log.info('Forced request of PTC Access Token!')
                 else:
