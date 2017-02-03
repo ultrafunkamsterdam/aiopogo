@@ -59,6 +59,10 @@ class BannedAccountException(PgoapiError):
     """Raised when an account is banned"""
 
 
+class ExpiredHashKeyException(HashServerException):
+    """Raised when a hash key has expired."""
+
+
 class MalformedResponseException(PgoapiError):
     """Raised when the response is empty or not in an expected format"""
 

@@ -9,7 +9,7 @@ from asyncio import TimeoutError
 from concurrent.futures import TimeoutError as TimeoutError2
 
 from .hash_engine import HashEngine
-from .exceptions import BadHashRequestException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
+from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, UnexpectedHashResponseException
 from .session import Session
 from .utilities import JSONByteEncoder
 
@@ -46,7 +46,7 @@ class HashServer(HashEngine):
             async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=self.timeout) as resp:
                 if resp.status == 400:
                     text = await resp.text()
-                    raise BadHashRequestException("400: Bad request, error: {}".format(text))
+                    raise ExpiredHashKeyException("This hash key appears to have expired. {}".format(text))
                 elif resp.status == 403:
                     raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
                 elif resp.status == 429:
