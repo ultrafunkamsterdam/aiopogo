@@ -125,11 +125,11 @@ class RpcApi:
         try:
             async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.TIMEOUT, proxy=self.proxy) as resp:
                 if resp.status == 400:
-                    raise BadRequestException("400: Bad Request")
+                    raise BadRequestException("400: Bad RPC Request")
                 if resp.status == 403:
                     raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong...")
                 elif resp.status in (502, 503, 504):
-                    raise NianticOfflineException('{} Server Error'.format(resp.status))
+                    raise NianticOfflineException('{} Niantic Server Error'.format(resp.status))
                 elif resp.status != 200:
                     raise UnexpectedResponseException('Unexpected HTTP server response - needs 200 got {}'.format(resp.status))
 
@@ -141,7 +141,7 @@ class RpcApi:
         except (TimeoutError, TimeoutError2) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
         except (ClientError, DisconnectedError) as e:
-            raise NianticOfflineException('Caught a client or disconnected error.') from e
+            raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
 
         return content
 

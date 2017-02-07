@@ -41,7 +41,7 @@ except ImportError:
 from pogo_async.session import proxy_connector
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
-from pogo_async.exceptions import AuthException, AuthTimeoutException, InvalidCredentialsException
+from pogo_async.exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException
 
 
 class AuthPtc(Auth):
@@ -103,11 +103,11 @@ class AuthPtc(Auth):
             except (ProxyConnectionError, SocksError) as e:
                 raise ProxyConnectionError from e
             except JSONDecodeError as e:
-                raise AuthException('Unable to parse response') from e
+                raise AuthException('Unable to parse first response') from e
             except (ClientError, DisconnectedError) as e:
-                raise AuthException('Caught a client or disconnected error.') from e
+                raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
             except Exception as e:
-                raise AuthException('First request failed.') from e
+                raise AuthException('Could not retrieve token or ticket: {}'.format(e.__class__.__name__)) from e
 
             try:
                 data['_eventId'] = 'submit'
@@ -118,17 +118,30 @@ class AuthPtc(Auth):
 
             try:
                 async with self._session.post(self.PTC_LOGIN_URL, data=data, timeout=self.timeout, proxy=self.proxy, allow_redirects=False) as resp:
-                    qs = parse_qs(urlsplit(resp.headers['Location'])[3])
-                    self._refresh_token = qs['ticket'][0]
-                    self._access_token = resp.cookies['CASTGC'].value
+                    try:
+                        qs = parse_qs(urlsplit(resp.headers['Location'])[3])
+                        self._refresh_token = qs['ticket'][0]
+                        self._access_token = resp.cookies['CASTGC'].value
+                    except KeyError:
+                        try:
+                            j = await resp.json()
+                            error_code = j['error_code']
+                        except (JSONDecodeError, KeyError) as e:
+                            raise AuthException('Unable to login or parse response.') from e
+                        if error_code == 'users.login.activation_required':
+                            raise ActivationRequiredException('Account email not verified.')
+                        else:
+                            raise AuthException('Error code: {}'.format(error_code))
             except (TimeoutError, TimeoutError2) as e:
                 raise AuthTimeoutException('Auth POST timed out.') from e
             except (ProxyConnectionError, SocksError) as e:
                 raise ProxyConnectionError from e
             except (ClientError, DisconnectedError) as e:
-                raise AuthException('Caught a client or disconnected error.') from e
+                raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
+            except AuthException:
+                raise
             except Exception as e:
-                raise AuthException('Could not retrieve token.') from e
+                raise AuthException('Could not retrieve token or ticket: {}'.format(e.__class__.__name__)) from e
 
             if self._access_token:
                 self._login = True
@@ -185,9 +198,9 @@ class AuthPtc(Auth):
                 except (ProxyConnectionError, SocksError) as e:
                     raise ProxyConnectionError from e
                 except (ClientError, DisconnectedError) as e:
-                    raise AuthException('Caught a client or disconnected error.') from e
+                    raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
                 except Exception as e:
-                    raise AuthException('Could not retrieve token.') from e
+                    raise AuthException('Could not retrieve token: {}'.format(e.__class__.__name__)) from e
 
                 if self._access_token is not None:
                     # set expiration to an hour less than value received because Pokemon OAuth

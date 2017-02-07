@@ -52,7 +52,7 @@ class HashServer(HashEngine):
                 elif resp.status == 429:
                     raise HashingQuotaExceededException("429: Request limited.")
                 elif resp.status in (502, 503, 504):
-                    raise HashingOfflineException('{} Server Error'.format(resp.status))
+                    raise HashingOfflineException('{} Hashing Server Error'.format(resp.status))
                 elif resp.status != 200:
                     text = await resp.text()
                     error = 'Unexpected HTTP server response - needs 200 got {c}. {t}'.format(
@@ -75,7 +75,7 @@ class HashServer(HashEngine):
         except (TimeoutError, TimeoutError2) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e
         except (ClientError, DisconnectedError) as e:
-            raise HashingOfflineException('Caught client or disconnected error.') from e
+            raise HashingOfflineException('{} during hashing. {}'.format(e.__class__.__name__, e)) from e
 
         try:
             self.location_auth_hash = c_int32(response_parsed['locationAuthHash']).value

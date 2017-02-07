@@ -132,7 +132,7 @@ class PGoApi:
         if func.upper() in RequestType.keys():
             return await function
         else:
-            raise AttributeError
+            raise AttributeError('{} not known.'.format(func))
 
 
 class PGoApiRequest:
@@ -156,11 +156,11 @@ class PGoApiRequest:
 
     async def call(self):
         if self._position[0] is None or self._position[1] is None:
-            raise NoPlayerPositionSetException
+            raise NoPlayerPositionSetException('No position set.')
 
         if self._auth_provider is None or not self._auth_provider.is_login():
             self.log.info('Not logged in')
-            raise NotLoggedInException
+            raise NotLoggedInException('Not logged in.')
 
         request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)
 
@@ -227,4 +227,4 @@ class PGoApiRequest:
         if func.upper() in RequestType.keys():
             return function
         else:
-            raise AttributeError
+            raise AttributeError('{} not known.'.format(func))

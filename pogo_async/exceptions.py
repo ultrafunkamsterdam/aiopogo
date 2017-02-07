@@ -37,6 +37,9 @@ class TimeoutException(PgoapiError):
 class AuthException(PgoapiError):
     """Raised when logging in fails"""
 
+class ActivationRequiredException(AuthException):
+    """Raised when an account needs to verify its email."""
+
 class AuthTimeoutException(AuthException, TimeoutException):
     """Raised when an auth request times out."""
 
@@ -83,6 +86,9 @@ class NotLoggedInException(PgoapiError):
 
 class ServerBusyOrOfflineException(PgoapiError):
     """Raised when unable to establish a connection with a server"""
+
+class AuthConnectionException(AuthException, ServerBusyOrOfflineException):
+    """Raised when there's a connection error during auth."""
 
 class NianticOfflineException(ServerBusyOrOfflineException):
     """Raised when unable to establish a conection with Niantic"""
