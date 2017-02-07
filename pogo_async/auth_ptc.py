@@ -156,6 +156,7 @@ class AuthPtc(Auth):
             self.session_start()
             try:
                 self._login = False
+                self._access_token = None
                 if force_refresh:
                     self.log.info('Forced request of PTC Access Token!')
                 else:
@@ -172,7 +173,8 @@ class AuthPtc(Auth):
                 try:
                     async with self._session.post(self.PTC_LOGIN_OAUTH, data=data, timeout=self.timeout, proxy=self.proxy) as resp:
                         qs = await resp.text()
-                    access_token = parse_qs(qs).get('access_token')
+                    token_data = parse_qs(qs)
+                    self._access_token = token_data['access_token'][0]
                 except (TimeoutError, TimeoutError2) as e:
                     raise AuthTimeoutException('Auth POST timed out.') from e
                 except (ProxyConnectionError, SocksError) as e:
@@ -182,14 +184,15 @@ class AuthPtc(Auth):
                 except Exception as e:
                     raise AuthException('Could not retrieve token.') from e
 
-                if access_token is not None:
-                    self._access_token = access_token[0]
-
+                if self._access_token is not None:
                     # set expiration to an hour less than value received because Pokemon OAuth
                     # login servers return an access token with an explicit expiry time of
                     # three hours, however, the token stops being valid after two hours.
                     # See issue #86
-                    expires = int(token_data.get('expires', [0])[0]) - 3600
+                    try:
+                        expires = token_data['expires'][0] - 3600
+                    except (KeyError, TypeError):
+                        expires = 0
                     if expires > 0:
                         self._access_token_expiry = expires + get_time()
                     else:
@@ -199,8 +202,6 @@ class AuthPtc(Auth):
 
                     self.log.info('PTC Access Token successfully retrieved.')
                 else:
-                    self._access_token = None
-                    self._login = False
                     if force_refresh and self._password:
                         self.log.info('Reauthenticating with refresh token failed, using credentials instead.')
                         return await self.user_login(retry=False)
