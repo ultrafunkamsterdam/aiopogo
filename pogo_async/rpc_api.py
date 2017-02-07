@@ -158,20 +158,19 @@ class RpcApi:
         self.check_authentication(response_dict)
 
         # some response validations
-        if isinstance(response_dict, dict):
-            status_code = response_dict.get('status_code')
+        try:
+            status_code = response_dict['status_code']
             if status_code == 102:
                 raise AuthTokenExpiredException
             elif status_code == 52:
-                raise NianticThrottlingException("Request throttled by server... slow down man")
+                raise NianticThrottlingException("Request throttled by server... {}".format(subrequests))
             elif status_code == 53:
-                api_url = response_dict.get('api_url')
-                if api_url:
-                    exception = ServerApiEndpointRedirectException()
-                    exception.set_redirected_endpoint(api_url)
-                    raise exception
-                else:
-                    raise UnexpectedResponseException
+                api_url = response_dict['api_url']
+                exception = ServerApiEndpointRedirectException()
+                exception.set_redirected_endpoint(api_url)
+                raise exception
+        except TypeError:
+            raise UnexpectedResponseException
 
         return response_dict
 
@@ -184,14 +183,6 @@ class RpcApi:
 
                 self._auth_provider.set_ticket(
                     (timestamp, auth_ticket['start'], auth_ticket['end']))
-
-                now_ms = get_time(ms=True)
-                h, m, s = get_format_time_diff(now_ms, auth_ticket['expire_timestamp_ms'], True)
-
-                if had_ticket:
-                    self.log.debug('Replacing old Session Ticket with new one valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
-                else:
-                    self.log.debug('Received Session Ticket valid for %02d:%02d:%02d hours (%s < %s)', h, m, s, now_ms, auth_ticket['expire_timestamp_ms'])
         except (TypeError, KeyError):
             return
 

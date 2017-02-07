@@ -91,6 +91,7 @@ class AuthPtc(Auth):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
         self.log.info('PTC User Login for: {}'.format(self._username))
+        self._access_token = None
         self.session_start()
         try:
             now = get_time()
@@ -109,18 +110,16 @@ class AuthPtc(Auth):
                 raise AuthException('First request failed.') from e
 
             try:
-                data.update({
-                    '_eventId': 'submit',
-                    'username': self._username,
-                    'password': self._password,
-                })
-            except (ValueError, AttributeError) as e:
+                data['_eventId'] = 'submit'
+                data['username'] = self._username
+                data['password'] = self._password
+            except (TypeError) as e:
                 raise AuthException('Invalid JSON response.') from e
 
             try:
                 async with self._session.post(self.PTC_LOGIN_URL, data=data, timeout=self.timeout, proxy=self.proxy, allow_redirects=False) as resp:
                     qs = parse_qs(urlsplit(resp.headers['Location'])[3])
-                    self._refresh_token = qs.get('ticket')[0]
+                    self._refresh_token = qs['ticket'][0]
                     self._access_token = resp.cookies['CASTGC'].value
             except (TimeoutError, TimeoutError2) as e:
                 raise AuthTimeoutException('Auth POST timed out.') from e
@@ -140,7 +139,7 @@ class AuthPtc(Auth):
             else:
                 self._login = False
                 raise AuthException("Could not retrieve a PTC Access Token")
-            return self._login
+            return self._access_token
         finally:
             self.session_close()
 
@@ -152,6 +151,8 @@ class AuthPtc(Auth):
         if force_refresh is False and self.check_access_token():
             self.log.debug('Using cached PTC Access Token')
             return self._access_token
+        elif self._refresh_token is None:
+            return await self.user_login()
         else:
             self.session_start()
             try:
@@ -167,14 +168,18 @@ class AuthPtc(Auth):
                     'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error',
                     'client_secret': self.PTC_LOGIN_CLIENT_SECRET,
                     'grant_type': 'refresh_token',
-                    'code': self._refresh_token,
+                    'code': self._refresh_token
                 }
 
                 try:
                     async with self._session.post(self.PTC_LOGIN_OAUTH, data=data, timeout=self.timeout, proxy=self.proxy) as resp:
                         qs = await resp.text()
+                    self._refresh_token = None
                     token_data = parse_qs(qs)
-                    self._access_token = token_data['access_token'][0]
+                    try:
+                        self._access_token = token_data['access_token'][0]
+                    except KeyError:
+                        return await self.user_login()
                 except (TimeoutError, TimeoutError2) as e:
                     raise AuthTimeoutException('Auth POST timed out.') from e
                 except (ProxyConnectionError, SocksError) as e:
@@ -190,21 +195,15 @@ class AuthPtc(Auth):
                     # three hours, however, the token stops being valid after two hours.
                     # See issue #86
                     try:
-                        expires = token_data['expires'][0] - 3600
+                        self._access_token_expiry = token_data['expires'][0] - 3600 + get_time()
                     except (KeyError, TypeError):
-                        expires = 0
-                    if expires > 0:
-                        self._access_token_expiry = expires + get_time()
-                    else:
                         self._access_token_expiry = 0
 
                     self._login = True
 
                     self.log.info('PTC Access Token successfully retrieved.')
                 else:
-                    if force_refresh and self._password:
-                        self.log.info('Reauthenticating with refresh token failed, using credentials instead.')
-                        return await self.user_login(retry=False)
-                    raise AuthException("Could not retrieve a PTC Access Token")
+                    self.log.info('Authenticating with refresh token failed, using credentials instead.')
+                    return await self.user_login(retry=False)
             finally:
                 self.session_close()
