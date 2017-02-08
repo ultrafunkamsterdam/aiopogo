@@ -38,17 +38,12 @@ import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientError, DisconnectedError, ProxyConnectionError
-from asyncio import TimeoutError
-from concurrent.futures import TimeoutError as TimeoutError2
-try:
-    from aiosocks import SocksError
-except ImportError:
-    class SocksError(ProxyConnectionError): pass
+from aiohttp import ClientError, DisconnectedError, HttpProcessingError
+
 
 from importlib import import_module
 
-from pogo_async.exceptions import AuthTokenExpiredException, BadRequestException, MalformedNianticResponseException, NianticIPBannedException, NianticOfflineException, NianticThrottlingException, NianticTimeoutException, NotLoggedInException, ServerApiEndpointRedirectException, UnexpectedResponseException
+from pogo_async.exceptions import *
 from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
 from pogo_async.hash_library import HashLibrary
 from pogo_async.hash_engine import HashEngine
@@ -124,21 +119,23 @@ class RpcApi:
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
             async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.TIMEOUT, proxy=self.proxy) as resp:
-                if resp.status == 400:
-                    raise BadRequestException("400: Bad RPC Request")
-                if resp.status == 403:
-                    raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong...")
-                elif resp.status in (502, 503, 504):
-                    raise NianticOfflineException('{} Niantic Server Error'.format(resp.status))
-                elif resp.status != 200:
-                    raise UnexpectedResponseException('Unexpected HTTP server response - needs 200 got {}'.format(resp.status))
+                resp.raise_for_status()
 
                 content = await resp.read()
                 if not content:
                     raise MalformedNianticResponseException('Empty server response!')
-        except (ProxyConnectionError, SocksError) as e:
-            raise ProxyConnectionError from e
-        except (TimeoutError, TimeoutError2) as e:
+        except HttpProcessingError as e:
+            if e.code == 400:
+                raise BadRequestException("400: Bad RPC request. {}".format(e.message))
+            elif e.code == 403:
+                raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong.")
+            elif e.code >= 500:
+                raise NianticOfflineException('{} Niantic server error: {}'.format(e.code, e.message))
+            else:
+                raise UnexpectedResponseException('Unexpected RPC response: {}, '.format(e.code, e.message))
+        except ProxyException as e:
+            raise ProxyException('Proxy connection error during RPC request.') from e
+        except TimeoutException as e:
             raise NianticTimeoutException('RPC request timed out.') from e
         except (ClientError, DisconnectedError) as e:
             raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
@@ -170,7 +167,7 @@ class RpcApi:
                 exception.set_redirected_endpoint(api_url)
                 raise exception
         except TypeError:
-            raise UnexpectedResponseException
+            raise UnexpectedResponseException('Could not parse status_code from response.')
 
         return response_dict
 
@@ -375,7 +372,7 @@ class RpcApi:
                 subrequest = mainrequest.requests.add()
                 subrequest.request_type = entry
             else:
-                raise Exception('Unknown value in request list')
+                raise BadRequestException('Unknown value in request list')
 
         return mainrequest
 
@@ -430,7 +427,7 @@ class RpcApi:
             subresponse_return = None
             try:
                 subresponse_extension = self.get_class(proto_classname)()
-            except Exception as e:
+            except Exception:
                 subresponse_extension = None
                 error = 'Protobuf definition for {} not found'.format(proto_classname)
                 subresponse_return = error
@@ -457,7 +454,7 @@ class RpcState:
         self.request = 1
         self.rand = Rand()
         self.session_hash = os.urandom(16)
-        self.course = random.uniform(0, 359.9)
+        self.course = random.uniform(0, 359.99)
 
     def request_id(self):
         self.request += 1
@@ -465,5 +462,5 @@ class RpcState:
         return (r << 32) | self.request
 
     def get_course(self):
-        self.course = random.triangular(0, 359.9, self.course)
+        self.course = random.triangular(0, 359.99, self.course)
         return self.course

@@ -37,20 +37,14 @@ class Auth:
 
         self._login = False
 
-        """ 
-        oauth2 uses refresh tokens (which basically never expires) 
-        to get an access_token which is only valid for a certain time)
-        """
+        # oauth2 uses refresh tokens (which basically never expires)
+        # to get an access_token which is only valid for a certain time)
         self._refresh_token = None
         self._access_token = None
         self._access_token_expiry = 0
-        # TODO: can be removed
-        self._auth_token = None
 
-        """ 
-        Pokemon Go uses internal tickets, like an internal 
-        session to keep a user logged in over a certain time (30 minutes)
-        """
+        # Pokemon Go uses internal tickets, like an internal
+        # session to keep a user logged in over a certain time (30 minutes)
         self._ticket_expire = None
         self._ticket_start = None
         self._ticket_end = None

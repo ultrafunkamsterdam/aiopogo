@@ -28,20 +28,16 @@ from future.standard_library import install_aliases
 install_aliases()
 
 from urllib.parse import parse_qs, urlsplit
-from six import string_types
-from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, ProxyConnectionError
 from json import JSONDecodeError
-from asyncio import get_event_loop, TimeoutError
-from concurrent.futures import TimeoutError as TimeoutError2
-try:
-    from aiosocks import SocksError
-except ImportError:
-    class SocksError(ProxyConnectionError): pass
+from asyncio import get_event_loop
+
+from six import string_types
+from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
 from pogo_async.session import proxy_connector
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
-from pogo_async.exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException
+from pogo_async.exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, TimeoutException
 
 
 class AuthPtc(Auth):
@@ -87,6 +83,7 @@ class AuthPtc(Auth):
     async def user_login(self, username=None, password=None, retry=True):
         self._username = username or self._username
         self._password = password or self._password
+        self._login = False
         if not isinstance(self._username, string_types) or not isinstance(self._password, string_types):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
@@ -95,64 +92,57 @@ class AuthPtc(Auth):
         self.session_start()
         try:
             now = get_time()
-            try:
-                async with self._session.get(self.PTC_LOGIN_URL, timeout=self.timeout, proxy=self.proxy) as resp:
-                    data = await resp.json()
-            except (TimeoutError, TimeoutError2) as e:
-                raise AuthTimeoutException('Auth GET timed out.') from e
-            except (ProxyConnectionError, SocksError) as e:
-                raise ProxyConnectionError from e
-            except JSONDecodeError as e:
-                raise AuthException('Unable to parse first response') from e
-            except (ClientError, DisconnectedError) as e:
-                raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
-            except Exception as e:
-                raise AuthException('Could not retrieve token or ticket: {}'.format(e.__class__.__name__)) from e
+            async with self._session.get(self.PTC_LOGIN_URL, timeout=self.timeout, proxy=self.proxy) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
 
             try:
                 data['_eventId'] = 'submit'
                 data['username'] = self._username
                 data['password'] = self._password
-            except (TypeError) as e:
-                raise AuthException('Invalid JSON response.') from e
+            except TypeError as e:
+                raise AuthException('Invalid initial JSON response.') from e
 
-            try:
-                async with self._session.post(self.PTC_LOGIN_URL, data=data, timeout=self.timeout, proxy=self.proxy, allow_redirects=False) as resp:
+            async with self._session.post(self.PTC_LOGIN_URL, data=data, timeout=self.timeout, proxy=self.proxy, allow_redirects=False) as resp:
+                resp.raise_for_status()
+                try:
+                    qs = parse_qs(urlsplit(resp.headers['Location'])[3])
+                    self._refresh_token = qs['ticket'][0]
+                    self._access_token = resp.cookies['CASTGC'].value
+                except KeyError:
                     try:
-                        qs = parse_qs(urlsplit(resp.headers['Location'])[3])
-                        self._refresh_token = qs['ticket'][0]
-                        self._access_token = resp.cookies['CASTGC'].value
-                    except KeyError:
-                        try:
-                            j = await resp.json()
-                            error_code = j['error_code']
-                        except (JSONDecodeError, KeyError) as e:
-                            raise AuthException('Unable to login or parse response.') from e
-                        if error_code == 'users.login.activation_required':
-                            raise ActivationRequiredException('Account email not verified.')
-                        else:
-                            raise AuthException('Error code: {}'.format(error_code))
-            except (TimeoutError, TimeoutError2) as e:
-                raise AuthTimeoutException('Auth POST timed out.') from e
-            except (ProxyConnectionError, SocksError) as e:
-                raise ProxyConnectionError from e
-            except (ClientError, DisconnectedError) as e:
-                raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
-            except AuthException:
-                raise
-            except Exception as e:
-                raise AuthException('Could not retrieve token or ticket: {}'.format(e.__class__.__name__)) from e
+                        j = await resp.json()
+                    except JSONDecodeError as e:
+                        raise AuthException('Unable to decode second response.') from e
+                    if j.get('error_code') == 'users.login.activation_required':
+                        raise ActivationRequiredException('Account email not verified.')
+                    try:
+                        error = j['errors'][0]
+                        raise AuthException(error)
+                    except (KeyError, IndexError) as e:
+                        raise AuthException('Unable to login or get error information.') from e
 
             if self._access_token:
                 self._login = True
-                self._access_token_expiry = int(now) + 7200
+                self._access_token_expiry = now + 7200
                 self.log.info('PTC User Login successful.')
             elif self._refresh_token and retry:
-                await self.get_access_token()
-            else:
-                self._login = False
-                raise AuthException("Could not retrieve a PTC Access Token")
+                return await self.get_access_token()
             return self._access_token
+        except HttpProcessingError as e:
+            raise AuthConnectionException('Error {} during user_login: {}'.format(e.code, e.message))
+        except TimeoutException as e:
+            raise AuthTimeoutException('user_login timeout.') from e
+        except ProxyException as e:
+            raise ProxyException('Proxy connection error during user_login.') from e
+        except JSONDecodeError as e:
+            raise AuthException('Unable to parse user_login response.') from e
+        except (ClientError, DisconnectedError) as e:
+            raise AuthConnectionException('{} during user_login.'.format(e.__class__.__name__)) from e
+        except AuthException:
+            raise
+        except Exception as e:
+            raise AuthException('{} during user_login.'.format(e.__class__.__name__)) from e
         finally:
             self.session_close()
 
@@ -184,23 +174,15 @@ class AuthPtc(Auth):
                     'code': self._refresh_token
                 }
 
-                try:
-                    async with self._session.post(self.PTC_LOGIN_OAUTH, data=data, timeout=self.timeout, proxy=self.proxy) as resp:
-                        qs = await resp.text()
+                async with self._session.post(self.PTC_LOGIN_OAUTH, data=data, timeout=self.timeout, proxy=self.proxy) as resp:
                     self._refresh_token = None
-                    token_data = parse_qs(qs)
-                    try:
-                        self._access_token = token_data['access_token'][0]
-                    except KeyError:
-                        return await self.user_login()
-                except (TimeoutError, TimeoutError2) as e:
-                    raise AuthTimeoutException('Auth POST timed out.') from e
-                except (ProxyConnectionError, SocksError) as e:
-                    raise ProxyConnectionError from e
-                except (ClientError, DisconnectedError) as e:
-                    raise AuthConnectionException('{} during auth. {}'.format(e.__class__.__name__, e)) from e
-                except Exception as e:
-                    raise AuthException('Could not retrieve token: {}'.format(e.__class__.__name__)) from e
+                    resp.raise_for_status()
+                    qs = await resp.text()
+                token_data = parse_qs(qs)
+                try:
+                    self._access_token = token_data['access_token'][0]
+                except (KeyError, IndexError):
+                    return await self.user_login(retry=False)
 
                 if self._access_token is not None:
                     # set expiration to an hour less than value received because Pokemon OAuth
@@ -209,14 +191,27 @@ class AuthPtc(Auth):
                     # See issue #86
                     try:
                         self._access_token_expiry = token_data['expires'][0] - 3600 + get_time()
-                    except (KeyError, TypeError):
+                    except (KeyError, IndexError, TypeError):
                         self._access_token_expiry = 0
 
                     self._login = True
 
                     self.log.info('PTC Access Token successfully retrieved.')
+                    return self._access_token
                 else:
                     self.log.info('Authenticating with refresh token failed, using credentials instead.')
                     return await self.user_login(retry=False)
+            except HttpProcessingError as e:
+                raise AuthConnectionException('Error {} while fetching access token: {}'.format(e.code, e.message))
+            except TimeoutException as e:
+                raise AuthTimeoutException('Access token request timed out.') from e
+            except ProxyException as e:
+                raise ProxyException('Proxy connection error while fetching access token.') from e
+            except (ClientError, DisconnectedError) as e:
+                raise AuthConnectionException('{} while fetching access token.'.format(e.__class__.__name__)) from e
+            except AuthException:
+                raise
+            except Exception as e:
+                raise AuthException('{} while fetching access token.'.format(e.__class__.__name__)) from e
             finally:
                 self.session_close()

@@ -23,6 +23,13 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
+from aiohttp import ProxyConnectionError
+from concurrent.futures import TimeoutError
+try:
+    from aiosocks import SocksError
+except ImportError:
+    class SocksError(Exception): pass
+
 
 class PgoapiError(Exception):
     """Any custom exception in this module"""
@@ -30,7 +37,10 @@ class PgoapiError(Exception):
 class HashServerException(PgoapiError):
     """Parent class of all hashing server errors"""
 
-class TimeoutException(PgoapiError):
+class ProxyException(ProxyConnectionError, SocksError):
+    """Raised when there is an error connecting to a proxy server."""
+
+class TimeoutException(PgoapiError, TimeoutError):
     """Raised when a request times out."""
 
 
