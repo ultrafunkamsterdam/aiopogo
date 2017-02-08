@@ -40,15 +40,15 @@ from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientError, DisconnectedError, HttpProcessingError
 
-
 from importlib import import_module
+from asyncio import TimeoutError
 
-from pogo_async.exceptions import *
-from pogo_async.utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
-from pogo_async.hash_library import HashLibrary
-from pogo_async.hash_engine import HashEngine
-from pogo_async.hash_server import HashServer
-from pogo_async.session import Session
+from .exceptions import *
+from .utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
+from .hash_library import HashLibrary
+from .hash_engine import HashEngine
+from .hash_server import HashServer
+from .session import Session
 
 from . import protos
 from pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope
@@ -135,7 +135,7 @@ class RpcApi:
                 raise UnexpectedResponseException('Unexpected RPC response: {}, '.format(e.code, e.message))
         except ProxyException as e:
             raise ProxyException('Proxy connection error during RPC request.') from e
-        except TimeoutException as e:
+        except (TimeoutException, TimeoutError) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
         except (ClientError, DisconnectedError) as e:
             raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e

@@ -24,7 +24,7 @@ Author: tjado <https://github.com/tejado>
 """
 
 from aiohttp import ProxyConnectionError
-from concurrent.futures import TimeoutError
+from asyncio import TimeoutError
 try:
     from aiosocks import SocksError
 except ImportError:

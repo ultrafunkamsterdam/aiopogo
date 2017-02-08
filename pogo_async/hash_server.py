@@ -6,6 +6,8 @@ from ctypes import c_int32, c_int64
 from base64 import b64encode
 from aiohttp import ClientError, DisconnectedError, HttpProcessingError
 
+from asyncio import TimeoutError
+
 from .hash_engine import HashEngine
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .session import Session
@@ -68,7 +70,7 @@ class HashServer(HashEngine):
                     response = await resp.json()
                 except (json.JSONDecodeError, ValueError) as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
-        except TimeoutException as e:
+        except (TimeoutException, TimeoutError) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e
         except (ClientError, DisconnectedError) as e:
             raise HashingOfflineException('{} during hashing. {}'.format(e.__class__.__name__, e)) from e

@@ -29,7 +29,7 @@ install_aliases()
 
 from urllib.parse import parse_qs, urlsplit
 from json import JSONDecodeError
-from asyncio import get_event_loop
+from asyncio import get_event_loop, TimeoutError
 
 from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
@@ -131,7 +131,7 @@ class AuthPtc(Auth):
             return self._access_token
         except HttpProcessingError as e:
             raise AuthConnectionException('Error {} during user_login: {}'.format(e.code, e.message))
-        except TimeoutException as e:
+        except (TimeoutError, TimeoutException) as e:
             raise AuthTimeoutException('user_login timeout.') from e
         except ProxyException as e:
             raise ProxyException('Proxy connection error during user_login.') from e
@@ -203,7 +203,7 @@ class AuthPtc(Auth):
                     return await self.user_login(retry=False)
             except HttpProcessingError as e:
                 raise AuthConnectionException('Error {} while fetching access token: {}'.format(e.code, e.message))
-            except TimeoutException as e:
+            except (TimeoutError, TimeoutException) as e:
                 raise AuthTimeoutException('Access token request timed out.') from e
             except ProxyException as e:
                 raise ProxyException('Proxy connection error while fetching access token.') from e
