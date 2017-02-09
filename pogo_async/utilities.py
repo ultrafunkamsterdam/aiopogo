@@ -31,7 +31,6 @@ from binascii import unhexlify
 
 # other stuff
 from google.protobuf.internal import encoder
-from geopy.geocoders import GoogleV3
 from s2sphere import LatLng, Angle, Cap, RegionCoverer
 from math import pi
 
@@ -65,18 +64,6 @@ def to_camel_case(value):
 class JSONByteEncoder(JSONEncoder):
     def default(self, o):
         return o.decode('ascii')
-
-
-def get_pos_by_name(location_name):
-    geolocator = GoogleV3()
-    loc = geolocator.geocode(location_name, timeout=10)
-    if not loc:
-        return None
-
-    log.info("Location for '%s' found: %s", location_name, loc.address)
-    log.info('Coordinates (lat/long/alt) for location: %s %s %s', loc.latitude, loc.longitude, loc.altitude)
-
-    return (loc.latitude, loc.longitude, loc.altitude)
 
 
 def get_cell_ids(lat, lon, radius=500):

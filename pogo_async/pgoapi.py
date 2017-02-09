@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 class PGoApi:
     def __init__(self, provider=None, position_lat=None, position_lng=None, position_alt=None, proxy_config=None, device_info=None):
         self.set_logger()
-        self.log.info('%s v%s - %s', __title__, __version__)
+        self.log.info('%s v%s', __title__, __version__)
 
         self._auth_provider = None
         self._state = RpcState()

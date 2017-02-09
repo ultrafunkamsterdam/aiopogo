@@ -27,7 +27,6 @@ Documentation is available at the [pgoapi wiki](https://wiki.pogodev.org).
  * aiohttp
  * protobuf (≥3)
  * gpsoauth
- * geopy
  * s2sphere
 
 ## Contribution
