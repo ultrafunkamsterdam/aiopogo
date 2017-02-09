@@ -28,15 +28,16 @@ import platform
 
 from json import JSONEncoder
 from binascii import unhexlify
+from math import pi
+from array import array
 
-# other stuff
 from google.protobuf.internal import encoder
 from s2sphere import LatLng, Angle, Cap, RegionCoverer
-from math import pi
 
 log = logging.getLogger(__name__)
 
 EARTH_RADIUS = 6371009  # radius of Earth in meters
+CELL_DIVISOR = 2 * pi * EARTH_RADIUS
 
 def f2i(float):
   return struct.unpack('<Q', struct.pack('<d', float))[0]
@@ -66,18 +67,21 @@ class JSONByteEncoder(JSONEncoder):
         return o.decode('ascii')
 
 
-def get_cell_ids(lat, lon, radius=500):
+def get_cell_ids(lat, lon, radius=500, compact=False):
     # Max values allowed by server according to this comment:
     # https://github.com/AeonLucid/POGOProtos/issues/83#issuecomment-235612285
     if radius > 1500:
         radius = 1500  # radius = 1500 is max allowed by the server
-    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), Angle.from_degrees(360*radius/(2 * pi *EARTH_RADIUS)))
+    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), Angle.from_degrees(360 * radius / CELL_DIVISOR))
     coverer = RegionCoverer()
     coverer.min_level = 15
     coverer.max_level = 15
     cells = coverer.get_covering(region)
-    cells = cells[:100]  # len(cells) = 100 is max allowed by the server
-    return sorted([x.id() for x in cells])
+    if radius > 1250:
+        del cells[100:]  # 100 is max allowed by the server
+    if compact:
+        return array('Q', (x.id() for x in cells))
+    return tuple(x.id() for x in cells)
 
 
 def get_time(ms = False):

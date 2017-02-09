@@ -42,6 +42,7 @@ from aiohttp import ClientError, DisconnectedError, HttpProcessingError
 
 from importlib import import_module
 from asyncio import TimeoutError
+from array import array
 
 from .exceptions import *
 from .utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
@@ -337,8 +338,8 @@ class RpcApi:
                 self.log.debug("Subrequest class: %s", proto_classname)
 
                 for key, value in entry_content.items():
-                    if isinstance(value, list):
-                        self.log.debug("Found list: %s - trying as repeated", key)
+                    if isinstance(value, (list, tuple, array)):
+                        self.log.debug("Found sequence: %s - trying as repeated", key)
                         for i in value:
                             try:
                                 self.log.debug("%s -> %s", key, i)
