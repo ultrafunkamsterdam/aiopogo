@@ -99,14 +99,14 @@ else:
     _cells = _cells_py
 
 
-def cell_ids(lat, lon, angle=DEFAULT_ANGLE, compact=False):
-    cells = _cells(lat, lon, angle)
+def get_cell_ids(lat, lon, compact=False):
+    cells = _cells(lat, lon, DEFAULT_ANGLE)
     if compact:
         return array('Q', (x.id() for x in cells))
     return tuple(x.id() for x in cells)
 
 
-def get_cell_ids(lat, lon, radius=None, compact=False):
+def get_cell_ids_custom(lat, lon, radius=None, compact=False):
     # Max values allowed by server according to this comment:
     # https://github.com/AeonLucid/POGOProtos/issues/83#issuecomment-235612285
     if not radius:
@@ -117,7 +117,7 @@ def get_cell_ids(lat, lon, radius=None, compact=False):
         angle = Angle.from_degrees(360 * radius / (2 * pi * EARTH_RADIUS))
     cells = _cells(lat, lon, angle)
 
-    if radius > 1250:
+    if radius and radius > 1250:
         del cells[100:]  # 100 is max allowed by the server
     if compact:
         return array('Q', (x.id() for x in cells))
