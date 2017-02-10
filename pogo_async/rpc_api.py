@@ -144,6 +144,7 @@ class RpcApi:
 
         return content
 
+    @staticmethod
     def get_request_name(subrequests):
         try:
             return to_camel_case(RequestType.Value(subrequests[0]))
