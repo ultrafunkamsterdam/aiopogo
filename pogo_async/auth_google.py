@@ -57,10 +57,7 @@ class AuthGoogle(Auth):
 
         user_login = perform_master_login(username, password, self.GOOGLE_LOGIN_ANDROID_ID, proxy=self._proxy)
 
-        try:
-            refresh_token = user_login.get('Token', None)
-        except ConnectionError as e:
-            raise AuthException("Caught ConnectionError: %s", e)
+        refresh_token = user_login.get('Token')
 
         if refresh_token is not None:
             self._refresh_token = refresh_token
@@ -91,7 +88,7 @@ class AuthGoogle(Auth):
             token_data = perform_oauth(None, self._refresh_token, self.GOOGLE_LOGIN_ANDROID_ID, self.GOOGLE_LOGIN_SERVICE, self.GOOGLE_LOGIN_APP,
                 self.GOOGLE_LOGIN_CLIENT_SIG, proxy=self._proxy)
 
-            access_token = token_data.get('Auth', None)
+            access_token = token_data.get('Auth')
             if access_token is not None:
                 self._access_token = access_token
                 self._access_token_expiry = int(token_data.get('Expiry', 0))

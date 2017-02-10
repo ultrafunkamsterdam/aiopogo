@@ -45,7 +45,7 @@ from asyncio import TimeoutError
 from array import array
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time, get_format_time_diff, get_lib_paths, Rand
+from .utilities import to_camel_case, get_time, get_lib_paths, Rand
 from .hash_library import HashLibrary
 from .hash_engine import HashEngine
 from .hash_server import HashServer
@@ -139,9 +139,18 @@ class RpcApi:
         except (TimeoutException, TimeoutError) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
         except (ClientError, DisconnectedError) as e:
-            raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
+            err = e.__cause__ or e
+            raise NianticOfflineException('{} during RPC. {}'.format(err.__class__.__name__, e)) from e
 
         return content
+
+    def get_request_name(subrequests):
+        try:
+            return to_camel_case(RequestType.Value(subrequests[0]))
+        except IndexError:
+            return 'empty'
+        except Exception:
+            return 'unknown'
 
     async def request(self, endpoint, subrequests, player_position):
 
@@ -161,14 +170,16 @@ class RpcApi:
             if status_code == 102:
                 raise AuthTokenExpiredException
             elif status_code == 52:
-                raise NianticThrottlingException("Request throttled by server... {}".format(subrequests))
+                req_type = self.get_request_name(subrequests)
+                raise NianticThrottlingException("Request throttled on {} request.".format(req_type))
             elif status_code == 53:
                 api_url = response_dict['api_url']
                 exception = ServerApiEndpointRedirectException()
                 exception.set_redirected_endpoint(api_url)
                 raise exception
         except TypeError:
-            raise UnexpectedResponseException('Could not parse status_code from response.')
+            req_type = self.get_request_name(subrequests)
+            raise UnexpectedResponseException('Could not parse status_code from {} response.'.format(req_type))
 
         return response_dict
 

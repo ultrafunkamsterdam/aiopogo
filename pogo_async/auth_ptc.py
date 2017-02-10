@@ -114,12 +114,12 @@ class AuthPtc(Auth):
                         j = await resp.json()
                     except JSONDecodeError as e:
                         raise AuthException('Unable to decode second response.') from e
-                    if j.get('error_code') == 'users.login.activation_required':
-                        raise ActivationRequiredException('Account email not verified.')
                     try:
+                        if j.get('error_code') == 'users.login.activation_required':
+                            raise ActivationRequiredException('Account email not verified.')
                         error = j['errors'][0]
                         raise AuthException(error)
-                    except (KeyError, IndexError) as e:
+                    except (AttributeError, KeyError, IndexError) as e:
                         raise AuthException('Unable to login or get error information.') from e
 
             if self._access_token:

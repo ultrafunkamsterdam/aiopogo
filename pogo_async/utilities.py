@@ -31,7 +31,14 @@ from binascii import unhexlify
 from math import pi
 from array import array
 
+try:
+    from numba import jit
+except ImportError:
+    def jit(func):
+        return func
+
 EARTH_RADIUS = 6371009  # radius of Earth in meters
+
 try:
     from s2 import (
         S1Angle as Angle,
@@ -50,15 +57,15 @@ log = logging.getLogger(__name__)
 
 
 def f2i(float):
-  return struct.unpack('<Q', struct.pack('<d', float))[0]
+    return struct.unpack('<Q', struct.pack('<d', float))[0]
 
 
 def f2h(float):
-  return hex(struct.unpack('<Q', struct.pack('<d', float))[0])
+    return hex(struct.unpack('<Q', struct.pack('<d', float))[0])
 
 
 def h2f(hex):
-  return struct.unpack('<d', struct.pack('<Q', int(hex,16)))[0]
+    return struct.unpack('<d', struct.pack('<Q', int(hex,16)))[0]
 
 
 def d2h(f):
@@ -68,7 +75,7 @@ def d2h(f):
 
 
 def to_camel_case(value):
-  return ''.join(word.capitalize() if word else '_' for word in value.split('_'))
+    return ''.join(word.capitalize() if word else '_' for word in value.split('_'))
 
 
 # JSON Encoder to handle bytes
@@ -124,14 +131,15 @@ def get_cell_ids_custom(lat, lon, radius=None, compact=False):
     return tuple(x.id() for x in cells)
 
 
-def get_time(ms = False):
+def get_time(ms=False):
     if ms:
         return int(time.time() * 1000)
     else:
         return int(time.time())
 
 
-def get_format_time_diff(low, high, ms = True):
+@jit
+def get_format_time_diff(low, high, ms=True):
     diff = (high - low)
     if ms:
         m, s = divmod(diff / 1000, 60)
