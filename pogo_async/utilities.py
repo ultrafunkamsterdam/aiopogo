@@ -37,7 +37,7 @@ from s2sphere import LatLng, Angle, Cap, RegionCoverer
 log = logging.getLogger(__name__)
 
 EARTH_RADIUS = 6371009  # radius of Earth in meters
-CELL_DIVISOR = 2 * pi * EARTH_RADIUS
+DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
 
 def f2i(float):
   return struct.unpack('<Q', struct.pack('<d', float))[0]
@@ -67,12 +67,16 @@ class JSONByteEncoder(JSONEncoder):
         return o.decode('ascii')
 
 
-def get_cell_ids(lat, lon, radius=500, compact=False):
+def get_cell_ids(lat, lon, radius=None, compact=False):
     # Max values allowed by server according to this comment:
     # https://github.com/AeonLucid/POGOProtos/issues/83#issuecomment-235612285
-    if radius > 1500:
-        radius = 1500  # radius = 1500 is max allowed by the server
-    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), Angle.from_degrees(360 * radius / CELL_DIVISOR))
+    if not radius:
+        angle = DEFAULT_ANGLE
+    else:
+        if radius > 1500:
+            radius = 1500  # radius = 1500 is max allowed by the server
+        angle = Angle.from_degrees(360 * radius / (2 * pi * EARTH_RADIUS))
+    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), angle)
     coverer = RegionCoverer()
     coverer.min_level = 15
     coverer.max_level = 15
