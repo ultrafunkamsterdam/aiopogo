@@ -31,13 +31,23 @@ from binascii import unhexlify
 from math import pi
 from array import array
 
-from google.protobuf.internal import encoder
-from s2sphere import LatLng, Angle, Cap, RegionCoverer
+EARTH_RADIUS = 6371009  # radius of Earth in meters
+try:
+    from s2 import (
+        S1Angle as Angle,
+        S2Cap as Cap,
+        S2LatLng as LatLng,
+        S2RegionCoverer as RegionCoverer
+    )
+    HAVE_S2 = True
+    DEFAULT_ANGLE = Angle.Degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
+except ImportError:
+    from s2sphere import Angle, Cap, LatLng, RegionCoverer
+    HAVE_S2 = False
+    DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
 
 log = logging.getLogger(__name__)
 
-EARTH_RADIUS = 6371009  # radius of Earth in meters
-DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
 
 def f2i(float):
   return struct.unpack('<Q', struct.pack('<d', float))[0]
@@ -67,6 +77,35 @@ class JSONByteEncoder(JSONEncoder):
         return o.decode('ascii')
 
 
+def _cells_py(lat, lon, angle):
+    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), angle)
+    coverer = RegionCoverer()
+    coverer.min_level = 15
+    coverer.max_level = 15
+    return coverer.get_covering(region)
+
+
+def _cells_cpp(lat, lon, angle):
+    region = Cap.FromAxisAngle(LatLng.FromDegrees(lat, lon).ToPoint(), angle)
+    coverer = RegionCoverer()
+    coverer.set_min_level(15)
+    coverer.set_max_level(15)
+    return coverer.GetCovering(region)
+
+
+if HAVE_S2:
+    _cells = _cells_cpp
+else:
+    _cells = _cells_py
+
+
+def cell_ids(lat, lon, angle=DEFAULT_ANGLE, compact=False):
+    cells = _cells(lat, lon, angle)
+    if compact:
+        return array('Q', (x.id() for x in cells))
+    return tuple(x.id() for x in cells)
+
+
 def get_cell_ids(lat, lon, radius=None, compact=False):
     # Max values allowed by server according to this comment:
     # https://github.com/AeonLucid/POGOProtos/issues/83#issuecomment-235612285
@@ -76,11 +115,8 @@ def get_cell_ids(lat, lon, radius=None, compact=False):
         if radius > 1500:
             radius = 1500  # radius = 1500 is max allowed by the server
         angle = Angle.from_degrees(360 * radius / (2 * pi * EARTH_RADIUS))
-    region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), angle)
-    coverer = RegionCoverer()
-    coverer.min_level = 15
-    coverer.max_level = 15
-    cells = coverer.get_covering(region)
+    cells = _cells(lat, lon, angle)
+
     if radius > 1250:
         del cells[100:]  # 100 is max allowed by the server
     if compact:
