@@ -43,7 +43,6 @@ try:
     HAVE_POGEO = True
 except ImportError:
     HAVE_POGEO = False
-    DEFAULT_ANGLE = Angle.Degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
     try:
         from s2 import (
             S1Angle as Angle,
@@ -52,6 +51,7 @@ except ImportError:
             S2RegionCoverer as RegionCoverer
         )
         HAVE_S2 = True
+        DEFAULT_ANGLE = Angle.Degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
     except ImportError:
         from s2sphere import Angle, Cap, LatLng, RegionCoverer
         HAVE_S2 = False
