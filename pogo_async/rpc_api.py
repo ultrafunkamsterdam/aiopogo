@@ -33,12 +33,17 @@ import logging
 import requests
 import subprocess
 import six
-import ctypes
 import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientError, DisconnectedError, HttpProcessingError
+try:
+    from pycrypt import pycrypt
+    HAVE_PYCRYPT = True
+except ImportError:
+    import ctypes
+    HAVE_PYCRYPT = False
 
 from importlib import import_module
 from asyncio import TimeoutError
@@ -61,9 +66,10 @@ from pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatE
 
 
 class RpcApi:
-    TIMEOUT = 3
+    TIMEOUT = 4
     signature_lib_path, hash_lib_path = get_lib_paths()
-    _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
+    if not HAVE_PYCRYPT:
+        _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
     log = logging.getLogger(__name__)
 
     def __init__(self, auth_provider, device_info, state, proxy=None):
@@ -322,15 +328,19 @@ class RpcApi:
 
         return request
 
-    def _generate_signature(self, signature_plain, timestamp):
-        self._signature_lib.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), ctypes.c_char]
-        self._signature_lib.restype = ctypes.c_int
-        rounded_size = len(signature_plain) + (256 - (len(signature_plain) % 256))
-        total_size = rounded_size + 5
-        output = ctypes.POINTER(ctypes.c_ubyte * total_size)()
-        output_size = self._signature_lib.encrypt(signature_plain, len(signature_plain), timestamp, ctypes.byref(output), self._encrypt_version)
-        signature = b''.join(list(map(lambda x: six.int2byte(x), output.contents)))
-        return signature
+    if HAVE_PYCRYPT:
+        def _generate_signature(self, signature, timestamp):
+            return pycrypt(signature, timestamp, self._encrypt_version)
+    else:
+        def _generate_signature(self, signature_plain, timestamp):
+            self._signature_lib.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), ctypes.c_char]
+            self._signature_lib.restype = ctypes.c_int
+            rounded_size = len(signature_plain) + (256 - (len(signature_plain) % 256))
+            total_size = rounded_size + 5
+            output = ctypes.POINTER(ctypes.c_ubyte * total_size)()
+            output_size = self._signature_lib.encrypt(signature_plain, len(signature_plain), timestamp, ctypes.byref(output), self._encrypt_version)
+            signature = b''.join(list(map(lambda x: six.int2byte(x), output.contents)))
+            return signature
 
     def _build_sub_requests(self, mainrequest, subrequest_list):
         self.log.debug('Generating sub RPC requests...')

@@ -160,7 +160,7 @@ class PGoApiRequest:
 
         try:
             if not self._auth_provider.is_login():
-                self._auth_provider.get_access_token()
+                await self._auth_provider.get_access_token()
         except AttributeError:
             raise NotLoggedInException('Not logged in.')
 
