@@ -17,7 +17,7 @@ def proxy_connector(proxy, loop=None):
             addr = Socks5Addr(proxy.host, proxy.port)
             if proxy.user and proxy.password:
                 auth = Socks5Auth(proxy.user, proxy.password)
-        return SocksConnector(proxy=addr, proxy_auth=auth, limit=500, loop=loop, remote_resolve=False, verify_ssl=False, keepalive_timeout=10)
+        return SocksConnector(proxy=addr, proxy_auth=auth, limit=300, loop=loop, remote_resolve=False, verify_ssl=False, keepalive_timeout=8)
     except NameError as e:
         raise ImportError('Install aiosocks to use socks proxies.') from e
 
@@ -32,7 +32,7 @@ class Session:
         if proxy:
             conn = proxy_connector(proxy, loop=cls.loop)
         else:
-            conn = TCPConnector(limit=500, loop=cls.loop, verify_ssl=False, keepalive_timeout=10)
+            conn = TCPConnector(limit=300, loop=cls.loop, verify_ssl=False, keepalive_timeout=8)
         cls.sessions[proxy] = ClientSession(connector=conn,
                                             loop=cls.loop,
                                             headers={'User-Agent': 'Niantic App'})

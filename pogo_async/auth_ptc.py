@@ -55,7 +55,7 @@ class AuthPtc(Auth):
         self._username = username
         self._password = password
         self.user_agent = user_agent or 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'
-        self.timeout = timeout or 10
+        self.timeout = timeout or 5
 
         if proxy and proxy.startswith('socks'):
             self.socks_proxy = proxy
@@ -138,7 +138,8 @@ class AuthPtc(Auth):
         except JSONDecodeError as e:
             raise AuthException('Unable to parse user_login response.') from e
         except (ClientError, DisconnectedError) as e:
-            raise AuthConnectionException('{} during user_login.'.format(e.__class__.__name__)) from e
+            err = e.__cause__ or e
+            raise AuthConnectionException('{} during user_login.'.format(err.__class__.__name__)) from e
         except AuthException:
             raise
         except Exception as e:

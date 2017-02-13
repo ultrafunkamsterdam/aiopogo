@@ -17,7 +17,7 @@ from .utilities import JSONByteEncoder
 class HashServer(HashEngine):
     endpoint = "https://pokehash.buddyauth.com/api/v125/hash"
     status = {}
-    timeout = 10
+    timeout = 4
 
     def __init__(self, auth_token):
         self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}
@@ -73,7 +73,8 @@ class HashServer(HashEngine):
         except (TimeoutException, TimeoutError) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e
         except (ClientError, DisconnectedError) as e:
-            raise HashingOfflineException('{} during hashing. {}'.format(e.__class__.__name__, e)) from e
+            err = e.__cause__ or e
+            raise HashingOfflineException('{} during hashing. {}'.format(err.__class__.__name__, e)) from e
 
         try:
             self.location_auth_hash = c_int32(response['locationAuthHash']).value

@@ -158,8 +158,10 @@ class PGoApiRequest:
         if self._position[0] is None or self._position[1] is None:
             raise NoPlayerPositionSetException('No position set.')
 
-        if self._auth_provider is None or not self._auth_provider.is_login():
-            self.log.info('Not logged in')
+        try:
+            if not self._auth_provider.is_login():
+                self._auth_provider.get_access_token()
+        except AttributeError:
             raise NotLoggedInException('Not logged in.')
 
         request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)

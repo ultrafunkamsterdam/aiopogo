@@ -61,7 +61,7 @@ from pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatE
 
 
 class RpcApi:
-    TIMEOUT = 15
+    TIMEOUT = 3
     signature_lib_path, hash_lib_path = get_lib_paths()
     _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
     log = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ class RpcApi:
     @staticmethod
     def get_request_name(subrequests):
         try:
-            return to_camel_case(RequestType.Value(subrequests[0]))
+            return to_camel_case(RequestType.Name(subrequests[0]))
         except IndexError:
             return 'empty'
         except Exception:
