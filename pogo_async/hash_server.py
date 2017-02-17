@@ -15,9 +15,9 @@ from .utilities import JSONByteEncoder
 
 
 class HashServer(HashEngine):
-    endpoint = "https://pokehash.buddyauth.com/api/v125/hash"
+    endpoint = "https://pokehash.buddyauth.com/api/v127_2/hash"
     status = {}
-    timeout = 4
+    timeout = 6
 
     def __init__(self, auth_token):
         self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}

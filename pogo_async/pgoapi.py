@@ -167,7 +167,7 @@ class PGoApiRequest:
         request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)
 
         if self.hash_token:
-            request.set_api_version(0.55)
+            request.set_api_version(0.57)
             request.activate_hash_server(self.hash_token)
         else:
             request.activate_hash_library()

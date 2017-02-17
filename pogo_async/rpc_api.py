@@ -66,7 +66,7 @@ from pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatE
 
 
 class RpcApi:
-    TIMEOUT = 4
+    TIMEOUT = 10
     signature_lib_path, hash_lib_path = get_lib_paths()
     if not HAVE_PYCRYPT:
         _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
@@ -297,7 +297,7 @@ class RpcApi:
             if self._api_version == 0.45:
                 sig.version_hash = -1553869577012279119
             else:
-                sig.version_hash = -9156899491064153954
+                sig.version_hash = -816976800928766045
 
             if self.device_info:
                 for key in self.device_info:
