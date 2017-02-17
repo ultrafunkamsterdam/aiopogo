@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='pogoprotos/networking/platform/responses/plat_eight_response.proto',
   package='pogoprotos.networking.platform.responses',
   syntax='proto3',
-  serialized_pb=_b('\nBpogoprotos/networking/platform/responses/plat_eight_response.proto\x12(pogoprotos.networking.platform.responses\"#\n\x11PlatEightResponse\x12\x0e\n\x06\x66ield2\x18\x02 \x01(\tb\x06proto3')
+  serialized_pb=_b('\nBpogoprotos/networking/platform/responses/plat_eight_response.proto\x12(pogoprotos.networking.platform.responses\"$\n\x11PlatEightResponse\x12\x0f\n\x07message\x18\x02 \x01(\tb\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -34,7 +34,7 @@ _PLATEIGHTRESPONSE = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='field2', full_name='pogoprotos.networking.platform.responses.PlatEightResponse.field2', index=0,
+      name='message', full_name='pogoprotos.networking.platform.responses.PlatEightResponse.message', index=0,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -53,7 +53,7 @@ _PLATEIGHTRESPONSE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=112,
-  serialized_end=147,
+  serialized_end=148,
 )
 
 DESCRIPTOR.message_types_by_name['PlatEightResponse'] = _PLATEIGHTRESPONSE
