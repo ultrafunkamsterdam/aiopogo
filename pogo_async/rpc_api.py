@@ -77,8 +77,6 @@ class RpcApi:
         self._auth_provider = auth_provider
         self.state = state
 
-        # mystical unknown6 - resolved by PokemonGoDev
-        self._signature_gen = True
         self._hash_engine = None
         self._api_version = 0.45
         self._encrypt_version = 2
@@ -230,98 +228,97 @@ class RpcApi:
             request.auth_info.token.unknown2 = self.token2
             ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
 
-        if self._signature_gen:
-            sig = SignalLog()
+        sig = SignalLog()
 
-            sig.field22 = self.state.session_hash
-            sig.epoch_timestamp_ms = get_time(ms=True)
-            sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
-            if sig.timestamp_ms_since_start < 5000:
-                sig.timestamp_ms_since_start = random.randint(5000, 8000)
+        sig.field22 = self.state.session_hash
+        sig.epoch_timestamp_ms = get_time(ms=True)
+        sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
+        if sig.timestamp_ms_since_start < 5000:
+            sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
-            await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
-            sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
-            sig.location_hash = self._hash_engine.location_hash
-            for req_hash in self._hash_engine.request_hashes:
-                sig.request_hashes.append(req_hash)
+        await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+        sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
+        sig.location_hash = self._hash_engine.location_hash
+        for req_hash in self._hash_engine.request_hashes:
+            sig.request_hashes.append(req_hash)
 
-            loc = sig.location_updates.add()
-            sen = sig.sensor_updates.add()
+        loc = sig.location_updates.add()
+        sen = sig.sensor_updates.add()
 
-            sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
-            loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
+        sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
+        loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
 
-            loc.name = 'fused'
-            loc.latitude = request.latitude
-            loc.longitude = request.longitude
+        loc.name = 'fused'
+        loc.latitude = request.latitude
+        loc.longitude = request.longitude
 
-            loc.altitude = altitude or random.triangular(300, 400, 350)
+        loc.altitude = altitude or random.triangular(300, 400, 350)
 
-            if random.random() > .95:
-                # no reading for roughly 1 in 20 updates
-                loc.device_course = -1
-                loc.device_speed = -1
+        if random.random() > .95:
+            # no reading for roughly 1 in 20 updates
+            loc.device_course = -1
+            loc.device_speed = -1
+        else:
+            loc.device_course = self.state.get_course()
+            loc.device_speed = random.triangular(0.2, 4.25, 1)
+
+        loc.provider_status = 3
+        loc.location_type = 1
+        if request.accuracy >= 65:
+            loc.vertical_accuracy = random.triangular(35, 100, 65)
+            loc.horizontal_accuracy = random.choice((request.accuracy, 65, 65, random.uniform(66,80), 200))
+        else:
+            if request.accuracy > 10:
+                loc.vertical_accuracy = random.choice((24, 32, 48, 48, 64, 64, 96, 128))
             else:
-                loc.device_course = self.state.get_course()
-                loc.device_speed = random.triangular(0.2, 4.25, 1)
+                loc.vertical_accuracy = random.choice((3, 4, 6, 6, 6, 6, 8, 12, 24))
+            loc.horizontal_accuracy = request.accuracy
 
-            loc.provider_status = 3
-            loc.location_type = 1
-            if request.accuracy >= 65:
-                loc.vertical_accuracy = random.triangular(35, 100, 65)
-                loc.horizontal_accuracy = random.choice((request.accuracy, 65, 65, random.uniform(66,80), 200))
-            else:
-                if request.accuracy > 10:
-                    loc.vertical_accuracy = random.choice((24, 32, 48, 48, 64, 64, 96, 128))
-                else:
-                    loc.vertical_accuracy = random.choice((3, 4, 6, 6, 6, 6, 8, 12, 24))
-                loc.horizontal_accuracy = request.accuracy
+        sen.acceleration_x = random.triangular(-1.7, 1.2, 0)
+        sen.acceleration_y = random.triangular(-1.4, 1.9, 0)
+        sen.acceleration_z = random.triangular(-1.4, .9, 0)
+        sen.magnetic_field_x = random.triangular(-54, 50, 0)
+        sen.magnetic_field_y = random.triangular(-51, 57, -4.8)
+        sen.magnetic_field_z = random.triangular(-56, 43, -30)
+        sen.magnetic_field_accuracy = random.choice((-1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2))
+        sen.attitude_pitch = random.triangular(-1.5, 1.5, 0.4)
+        sen.attitude_yaw = random.triangular(-3.1, 3.1, .198)
+        sen.attitude_roll = random.triangular(-2.8, 3.04, 0)
+        sen.rotation_rate_x = random.triangular(-4.7, 3.9, 0)
+        sen.rotation_rate_y = random.triangular(-4.7, 4.3, 0)
+        sen.rotation_rate_z = random.triangular(-4.7, 6.5, 0)
+        sen.gravity_x = random.triangular(-1, 1, 0)
+        sen.gravity_y = random.triangular(-1, 1, -.2)
+        sen.gravity_z = random.triangular(-1, .7, -0.7)
+        sen.status = 3
 
-            sen.acceleration_x = random.triangular(-1.7, 1.2, 0)
-            sen.acceleration_y = random.triangular(-1.4, 1.9, 0)
-            sen.acceleration_z = random.triangular(-1.4, .9, 0)
-            sen.magnetic_field_x = random.triangular(-54, 50, 0)
-            sen.magnetic_field_y = random.triangular(-51, 57, -4.8)
-            sen.magnetic_field_z = random.triangular(-56, 43, -30)
-            sen.magnetic_field_accuracy = random.choice((-1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2))
-            sen.attitude_pitch = random.triangular(-1.5, 1.5, 0.4)
-            sen.attitude_yaw = random.triangular(-3.1, 3.1, .198)
-            sen.attitude_roll = random.triangular(-2.8, 3.04, 0)
-            sen.rotation_rate_x = random.triangular(-4.7, 3.9, 0)
-            sen.rotation_rate_y = random.triangular(-4.7, 4.3, 0)
-            sen.rotation_rate_z = random.triangular(-4.7, 6.5, 0)
-            sen.gravity_x = random.triangular(-1, 1, 0)
-            sen.gravity_y = random.triangular(-1, 1, -.2)
-            sen.gravity_z = random.triangular(-1, .7, -0.7)
-            sen.status = 3
+        if self._api_version == 0.45:
+            sig.version_hash = -1553869577012279119
+        else:
+            sig.version_hash = -816976800928766045
 
-            if self._api_version == 0.45:
-                sig.version_hash = -1553869577012279119
-            else:
-                sig.version_hash = -816976800928766045
+        if self.device_info:
+            for key in self.device_info:
+                setattr(sig.device_info, key, self.device_info[key])
+            if self.device_info.get('brand', 'Apple') == 'Apple':
+                sig.ios_device_info.bool5 = True
 
-            if self.device_info:
-                for key in self.device_info:
-                    setattr(sig.device_info, key, self.device_info[key])
-                if self.device_info.get('brand', 'Apple') == 'Apple':
-                    sig.ios_device_info.bool5 = True
+        try:
+            if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
+                plat_eight = PlatEightRequest()
+                plat_eight.field1 = '90f6a704505bccac73cec99b07794993e6fd5a12'
+                plat8 = request.platform_requests.add()
+                plat8.type = 8
+                plat8.request_message = plat_eight.SerializeToString()
+        except (IndexError, AttributeError):
+            pass
 
-            try:
-                if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
-                    plat_eight = PlatEightRequest()
-                    plat_eight.field1 = '90f6a704505bccac73cec99b07794993e6fd5a12'
-                    plat8 = request.platform_requests.add()
-                    plat8.type = 8
-                    plat8.request_message = plat_eight.SerializeToString()
-            except (IndexError, AttributeError):
-                pass
-
-            signature_proto = sig.SerializeToString()
-            sig_request = SendEncryptedSignatureRequest()
-            sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_ms_since_start)
-            plat = request.platform_requests.add()
-            plat.type = 6
-            plat.request_message = sig_request.SerializeToString()
+        signature_proto = sig.SerializeToString()
+        sig_request = SendEncryptedSignatureRequest()
+        sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_ms_since_start)
+        plat = request.platform_requests.add()
+        plat.type = 6
+        plat.request_message = sig_request.SerializeToString()
 
         request.ms_since_last_locationfix = int(random.triangular(300, 30000, 10000))
 
