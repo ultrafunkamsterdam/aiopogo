@@ -3,21 +3,20 @@ from __future__ import absolute_import
 import ctypes
 import struct
 
-from pogo_async.hash_engine import HashEngine
 from pogo_async.utilities import d2h
 
 HASH_SEED = 0x46E945F8  # static hash seed from app
 
-class HashLibrary(HashEngine):
+class HashLibrary:
     def __init__(self, library_path):
         self._hash_lib = ctypes.cdll.LoadLibrary(library_path)
         self._hash_lib.compute_hash.argtypes = (ctypes.POINTER(ctypes.c_ubyte), ctypes.c_uint32)
         self._hash_lib.compute_hash.restype = ctypes.c_uint64
+        self.request_hashes = []
 
     async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
         self.location_hash = None
         self.location_auth_hash = None
-        self.request_hashes = []
 
         first_hash = self.hash32(authticket, seed=HASH_SEED)
         location_bytes = d2h(latitude) + d2h(longitude) + d2h(altitude)

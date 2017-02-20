@@ -1,44 +1,59 @@
 from aiohttp import TCPConnector, ClientSession
 from asyncio import get_event_loop
 from yarl import URL
+
 try:
     from aiosocks import Socks4Addr, Socks5Addr, Socks5Auth
     from aiosocks.connector import SocksConnector
 except ImportError:
-    pass
+    class SocksConnector:
+        def __init__(s, *args, **kwargs):
+            raise ImportError('Install aiosocks to use socks proxies.')
+    Socks4Addr = Socks5Addr = Socks5Auth = SocksConnector
 
-def proxy_connector(proxy, loop=None):
-    try:
-        proxy = URL(proxy)
-        auth = None
-        if proxy.scheme == 'socks4':
-            addr = Socks4Addr(proxy.host, proxy.port)
-        else:
-            addr = Socks5Addr(proxy.host, proxy.port)
-            if proxy.user and proxy.password:
-                auth = Socks5Auth(proxy.user, proxy.password)
-        return SocksConnector(proxy=addr, proxy_auth=auth, limit=300, loop=loop, remote_resolve=False, verify_ssl=False, keepalive_timeout=8)
-    except NameError as e:
-        raise ImportError('Install aiosocks to use socks proxies.') from e
+CONN_TIMEOUT = 6
 
-class Session:
-    sessions = {}
-    loop = get_event_loop()
 
-    @classmethod
-    def get(cls, proxy=None):
-        if proxy in cls.sessions:
-            return cls.sessions[proxy]
-        if proxy:
-            conn = proxy_connector(proxy, loop=cls.loop)
-        else:
-            conn = TCPConnector(limit=300, loop=cls.loop, verify_ssl=False, keepalive_timeout=8)
-        cls.sessions[proxy] = ClientSession(connector=conn,
-                                            loop=cls.loop,
-                                            headers={'User-Agent': 'Niantic App'})
-        return cls.sessions[proxy]
+def socks_connector(proxy, loop=None):
+    loop = loop or get_event_loop()
+    proxy = URL(proxy)
+    auth = None
+    if proxy.scheme == 'socks4':
+        addr = Socks4Addr(proxy.host, proxy.port)
+    else:
+        addr = Socks5Addr(proxy.host, proxy.port)
+        if proxy.user and proxy.password:
+            auth = Socks5Auth(proxy.user, proxy.password)
+    return SocksConnector(proxy=addr,
+                          proxy_auth=auth,
+                          limit=300,
+                          loop=loop,
+                          remote_resolve=False,
+                          verify_ssl=False)
 
-    @classmethod
-    def close(cls):
-        for session in cls.sessions.values():
+
+class SessionManager:
+    def __init__(self, loop=None):
+        self.loop = loop or get_event_loop()
+        self.sessions = {}
+
+    def get(self, proxy=None, headers={'User-Agent': 'Niantic App'}):
+        try:
+            return self.sessions[proxy]
+        except KeyError:
+            if proxy:
+                conn = socks_connector(proxy, self.loop)
+            else:
+                conn = TCPConnector(limit=300,
+                                    loop=self.loop,
+                                    verify_ssl=False,
+                                    conn_timeout=CONN_TIMEOUT)
+
+            self.sessions[proxy] = ClientSession(connector=conn,
+                                                 loop=self.loop,
+                                                 headers=headers)
+            return self.sessions[proxy]
+
+    def close(self):
+        for session in self.sessions.values():
             session.close()

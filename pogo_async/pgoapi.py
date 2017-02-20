@@ -32,11 +32,11 @@ import time
 logging.getLogger('aiohttp.client').setLevel(40)
 
 from . import __title__, __version__
-from pogo_async.rpc_api import RpcApi, RpcState
-from pogo_async.auth_ptc import AuthPtc
-from pogo_async.auth_google import AuthGoogle
-from pogo_async.utilities import parse_api_endpoint, get_time
-from pogo_async.exceptions import AuthException, AuthTokenExpiredException, BadRequestException, BannedAccountException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException, ServerBusyOrOfflineException, UnexpectedResponseException
+from .rpc_api import RpcApi, RpcState
+from .auth_ptc import AuthPtc
+from .auth_google import AuthGoogle
+from .utilities import parse_api_endpoint, get_time
+from .exceptions import AuthException, AuthTokenExpiredException, BadRequestException, BannedAccountException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException, ServerBusyOrOfflineException, UnexpectedResponseException
 
 from . import protos
 from pogoprotos.networking.requests.request_type_pb2 import RequestType

@@ -34,7 +34,7 @@ from asyncio import get_event_loop, TimeoutError
 from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
-from pogo_async.session import proxy_connector
+from pogo_async.session import socks_connector, CONN_TIMEOUT
 from pogo_async.auth import Auth
 from pogo_async.utilities import get_time
 from pogo_async.exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, TimeoutException
@@ -64,18 +64,18 @@ class AuthPtc(Auth):
             self.socks_proxy = None
             self.proxy = proxy
 
-    def session_start(self):
+    def activate_session(self):
         if self._session and not self._session.closed:
             return
         if self.socks_proxy:
-            conn = proxy_connector(self.socks_proxy, loop=self.loop)
+            conn = socks_connector(self.socks_proxy, loop=self.loop)
         else:
-            conn = TCPConnector(loop=self.loop, verify_ssl=False)
+            conn = TCPConnector(loop=self.loop, verify_ssl=False, conn_timeout=CONN_TIMEOUT)
         self._session = ClientSession(connector=conn,
                                       loop=self.loop,
                                       headers={'User-Agent': self.user_agent})
 
-    def session_close(self):
+    def close_session(self):
         if self._session.closed:
             return
         self._session.close()
@@ -89,7 +89,7 @@ class AuthPtc(Auth):
 
         self.log.info('PTC User Login for: {}'.format(self._username))
         self._access_token = None
-        self.session_start()
+        self.activate_session()
         try:
             now = get_time()
             async with self._session.get(self.PTC_LOGIN_URL, timeout=self.timeout, proxy=self.proxy) as resp:
@@ -145,7 +145,7 @@ class AuthPtc(Auth):
         except Exception as e:
             raise AuthException('{} during user_login.'.format(e.__class__.__name__)) from e
         finally:
-            self.session_close()
+            self.close_session()
 
     def set_refresh_token(self, refresh_token):
         self.log.info('PTC Refresh Token provided by user')
@@ -158,7 +158,7 @@ class AuthPtc(Auth):
         elif self._refresh_token is None:
             return await self.user_login()
         else:
-            self.session_start()
+            self.activate_session()
             try:
                 self._login = False
                 self._access_token = None
@@ -215,4 +215,4 @@ class AuthPtc(Auth):
             except Exception as e:
                 raise AuthException('{} while fetching access token.'.format(e.__class__.__name__)) from e
             finally:
-                self.session_close()
+                self.close_session()

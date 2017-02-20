@@ -4,29 +4,30 @@ import json
 
 from ctypes import c_int32, c_int64
 from base64 import b64encode
-from aiohttp import ClientError, DisconnectedError, HttpProcessingError
+from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
-from asyncio import TimeoutError
+from asyncio import get_event_loop, TimeoutError
 
-from .hash_engine import HashEngine
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
-from .session import Session
 from .utilities import JSONByteEncoder
+from .connector import TimedConnector
 
 
-class HashServer(HashEngine):
+class HashServer:
     endpoint = "https://pokehash.buddyauth.com/api/v127_2/hash"
     status = {}
-    timeout = 6
+    timeout = 15
+    _session = None
+    loop = get_event_loop()
 
     def __init__(self, auth_token):
-        self.headers = {'content-type': 'application/json', 'Accept' : 'application/json', 'User-Agent': 'Python pogo_async', 'X-AuthToken' : auth_token}
-        self._session = Session.get()
+        self.auth_token = auth_token
+        self.activate_session()
 
     async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
         self.location_hash = None
         self.location_auth_hash = None
-        self.request_hashes = []
+        headers = {'X-AuthToken': self.auth_token}
 
         payload = {
             'Timestamp': timestamp,
@@ -41,7 +42,7 @@ class HashServer(HashEngine):
 
         # request hashes from hashing server
         try:
-            async with self._session.post(self.endpoint, data=payload, headers=self.headers, timeout=self.timeout) as resp:
+            async with self._session.post(self.endpoint, headers=headers, data=payload, timeout=self.timeout) as resp:
                 try:
                     resp.raise_for_status()
                 except HttpProcessingError as e:
@@ -80,7 +81,27 @@ class HashServer(HashEngine):
             self.location_auth_hash = c_int32(response['locationAuthHash']).value
             self.location_hash = c_int32(response['locationHash']).value
 
-            for request_hash in response['requestHashes']:
-                self.request_hashes.append(c_int64(request_hash).value)
+            self.request_hashes = tuple(c_int64(x).value for x in response['requestHashes'])
         except Exception as e:
             raise MalformedHashResponseException('Unable to load values from hash response.') from e
+
+    @classmethod
+    def activate_session(cls):
+        if cls._session and not cls._session.closed:
+            return
+        headers = {'content-type': 'application/json',
+                   'Accept': 'application/json',
+                   'User-Agent': 'Python pogo_async'}
+        conn = TimedConnector(loop=cls.loop,
+                              limit=300,
+                              verify_ssl=False,
+                              conn_timeout=5)
+        cls._session = ClientSession(connector=conn,
+                                     loop=cls.loop,
+                                     headers=headers)
+
+    @classmethod
+    def close_session(cls):
+        if not cls._session or cls._session.closed:
+            return
+        cls._session.close()

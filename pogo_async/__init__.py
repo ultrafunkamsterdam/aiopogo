@@ -48,8 +48,13 @@ if (not protobuf_exist) or (int(protobuf_version[:1]) < 3):
     raise PleaseInstallProtobufVersion3()
 
 from pogo_async.pgoapi import PGoApi
-from pogo_async.rpc_api import RpcApi
+from pogo_async.rpc_api import RpcApi, RPC_SESSIONS
 from pogo_async.auth import Auth
+from .hash_server import HashServer
+
+def close_sessions():
+    RPC_SESSIONS.close()
+    HashServer.close_session()
 
 logging.getLogger("pogo_async").addHandler(logging.NullHandler())
 logging.getLogger("rpc_api").addHandler(logging.NullHandler())

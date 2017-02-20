@@ -52,9 +52,8 @@ from array import array
 from .exceptions import *
 from .utilities import to_camel_case, get_time, get_lib_paths, Rand
 from .hash_library import HashLibrary
-from .hash_engine import HashEngine
 from .hash_server import HashServer
-from .session import Session
+from .session import SessionManager
 
 from . import protos
 from pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope
@@ -64,9 +63,11 @@ from pogoprotos.networking.envelopes.signal_log_pb2 import SignalLog
 from pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
 from pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 
+RPC_SESSIONS = SessionManager()
+
 
 class RpcApi:
-    TIMEOUT = 10
+    timeout = 15
     signature_lib_path, hash_lib_path = get_lib_paths()
     if not HAVE_PYCRYPT:
         _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
@@ -83,10 +84,10 @@ class RpcApi:
         self._encrypt_version = 2
         self.request_proto = None
         if proxy and proxy.startswith('socks'):
-            self._session = Session.get(proxy)
+            self._session = RPC_SESSIONS.get(proxy)
             self.proxy = None
         else:
-            self._session = Session.get()
+            self._session = RPC_SESSIONS.get()
             self.proxy = proxy
 
         # data fields for SignalAgglom
@@ -125,7 +126,7 @@ class RpcApi:
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.TIMEOUT, proxy=self.proxy) as resp:
+            async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.timeout, proxy=self.proxy) as resp:
                 resp.raise_for_status()
 
                 content = await resp.read()
@@ -234,14 +235,14 @@ class RpcApi:
 
             sig.field22 = self.state.session_hash
             sig.epoch_timestamp_ms = get_time(ms=True)
-            sig.timestamp_ms_since_start = get_time(ms=True) - self.state.start_time
+            sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
             if sig.timestamp_ms_since_start < 5000:
                 sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
             await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
-            sig.location_hash_by_token_seed = self._hash_engine.get_location_auth_hash()
-            sig.location_hash = self._hash_engine.get_location_hash()
-            for req_hash in self._hash_engine.get_request_hashes():
+            sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
+            sig.location_hash = self._hash_engine.location_hash
+            for req_hash in self._hash_engine.request_hashes:
                 sig.request_hashes.append(req_hash)
 
             loc = sig.location_updates.add()
