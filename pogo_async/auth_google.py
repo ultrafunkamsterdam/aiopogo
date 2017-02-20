@@ -23,14 +23,12 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-
 import logging
 
 from pogo_async.auth import Auth
 from pogo_async.exceptions import AuthException, InvalidCredentialsException
 from gpsoauth import perform_master_login, perform_oauth
-from six import string_types
+
 
 class AuthGoogle(Auth):
 
@@ -52,7 +50,7 @@ class AuthGoogle(Auth):
     async def user_login(self, username, password):
         self.log.info('Google User Login for: {}'.format(username))
 
-        if not isinstance(username, string_types) or not isinstance(password, string_types):
+        if not isinstance(username, str) or not isinstance(password, str):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
         user_login = perform_master_login(username, password, self.GOOGLE_LOGIN_ANDROID_ID, proxy=self._proxy)

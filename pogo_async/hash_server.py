@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import json
 
 from ctypes import c_int32, c_int64

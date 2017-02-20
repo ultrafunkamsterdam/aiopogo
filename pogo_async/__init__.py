@@ -23,8 +23,6 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-
 from pogo_async.exceptions import PleaseInstallProtobufVersion3
 
 import pkg_resources

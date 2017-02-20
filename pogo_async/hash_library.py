@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import ctypes
 import struct
 
@@ -14,7 +12,7 @@ class HashLibrary:
         self._hash_lib.compute_hash.restype = ctypes.c_uint64
         self.request_hashes = []
 
-    async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
+    def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
         self.location_hash = None
         self.location_auth_hash = None
 

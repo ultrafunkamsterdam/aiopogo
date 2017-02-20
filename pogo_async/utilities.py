@@ -21,7 +21,6 @@ Author: tjado <https://github.com/tejado>
 
 import time
 import struct
-import logging
 import os
 import sys
 import platform
@@ -30,12 +29,7 @@ from json import JSONEncoder
 from binascii import unhexlify
 from math import pi
 from array import array
-
-try:
-    from numba import jit
-except ImportError:
-    def jit(func):
-        return func
+from logging import getLogger
 
 EARTH_RADIUS = 6371009  # radius of Earth in meters
 try:
@@ -43,21 +37,10 @@ try:
     HAVE_POGEO = True
 except ImportError:
     HAVE_POGEO = False
-    try:
-        from s2 import (
-            S1Angle as Angle,
-            S2Cap as Cap,
-            S2LatLng as LatLng,
-            S2RegionCoverer as RegionCoverer
-        )
-        HAVE_S2 = True
-        DEFAULT_ANGLE = Angle.Degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
-    except ImportError:
-        from s2sphere import Angle, Cap, LatLng, RegionCoverer
-        HAVE_S2 = False
-        DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
+    from s2sphere import Angle, Cap, LatLng, RegionCoverer
+    DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
 
-log = logging.getLogger(__name__)
+log = getLogger(__name__)
 
 
 def f2i(float):
@@ -94,20 +77,6 @@ if HAVE_POGEO:
             return array('Q', pogeo.get_cell_ids(lat, lon, radius))
         else:
             return pogeo.get_cell_ids(lat, lon, radius)
-elif HAVE_S2:
-    def get_cell_ids(lat, lon, radius=None, compact=False):
-        if radius:
-            angle = Angle.from_degrees(360 * radius / (2 * pi * EARTH_RADIUS))
-        else:
-            angle = DEFAULT_ANGLE
-        region = Cap.FromAxisAngle(LatLng.FromDegrees(lat, lon).ToPoint(), angle)
-        coverer = RegionCoverer()
-        coverer.set_min_level(15)
-        coverer.set_max_level(15)
-        covering = coverer.GetCovering(region)
-        if compact:
-            return array('Q', (x.id() for x in covering))
-        return tuple(x.id() for x in covering)
 else:
     def get_cell_ids(lat, lon, radius=None, compact=False):
         if radius:
@@ -124,14 +93,14 @@ else:
         return tuple(x.id() for x in covering)
 
 
-def get_time(ms=False):
-    if ms:
-        return int(time.time() * 1000)
-    else:
-        return int(time.time())
+def get_time():
+    return int(time.time())
 
 
-@jit
+def get_time_ms():
+    return int(time.time() * 1000)
+
+
 def get_format_time_diff(low, high, ms=True):
     diff = (high - low)
     if ms:
@@ -202,7 +171,7 @@ def long_to_bytes(val, endianness='big'):
     return s
 
 
-def get_lib_paths():
+def get_lib_paths(need_enc=False, need_hash=False):
     # win32 doesn't necessarily mean 32 bits
     arch = platform.architecture()[0]
     plat = sys.platform
@@ -245,17 +214,22 @@ def get_lib_paths():
         log.error(err)
         raise NotImplementedError(err)
 
-    encrypt_lib_path = os.path.join(os.path.dirname(__file__), "lib", encrypt_lib)
-    hash_lib_path = os.path.join(os.path.dirname(__file__), "lib", hash_lib)
+    if need_enc:
+        encrypt_lib_path = os.path.join(os.path.dirname(__file__), "lib", encrypt_lib)
+        if not os.path.isfile(encrypt_lib_path):
+            err = "Could not find {} encryption library {}".format(plat, encrypt_lib_path)
+            log.error(err)
+            raise OSError(err)
+    else:
+        encrypt_lib_path = None
 
-    if not os.path.isfile(encrypt_lib_path):
-        err = "Could not find {} encryption library {}".format(plat, encrypt_lib_path)
-        log.error(err)
-        raise OSError(err)
-
-    if not os.path.isfile(hash_lib_path):
-        err = "Could not find {} hashing library {}".format(plat, hash_lib_path)
-        log.error(err)
-        raise OSError(err)
+    if need_hash:
+        hash_lib_path = os.path.join(os.path.dirname(__file__), "lib", hash_lib)
+        if not os.path.isfile(hash_lib_path):
+            err = "Could not find {} hashing library {}".format(plat, hash_lib_path)
+            log.error(err)
+            raise OSError(err)
+    else:
+        hash_lib_path = None
 
     return encrypt_lib_path, hash_lib_path

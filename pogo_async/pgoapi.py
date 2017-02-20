@@ -23,8 +23,6 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-
 import re
 import logging
 import time

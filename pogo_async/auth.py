@@ -23,10 +23,8 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-
 import logging
-from pogo_async.utilities import get_time, get_format_time_diff
+from pogo_async.utilities import get_time, get_time_ms, get_format_time_diff
 
 class Auth:
 
@@ -75,7 +73,7 @@ class Auth:
 
     def check_ticket(self):
         if self.has_ticket():
-            now_ms = get_time(ms = True)
+            now_ms = get_time_ms()
             if now_ms < (self._ticket_expire - 10000):
                 return True
             else:

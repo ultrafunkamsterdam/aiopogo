@@ -23,15 +23,10 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-from future.standard_library import install_aliases
-install_aliases()
-
 from urllib.parse import parse_qs, urlsplit
 from json import JSONDecodeError
 from asyncio import get_event_loop, TimeoutError
 
-from six import string_types
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
 from pogo_async.session import socks_connector, CONN_TIMEOUT
@@ -84,7 +79,7 @@ class AuthPtc(Auth):
         self._username = username or self._username
         self._password = password or self._password
         self._login = False
-        if not isinstance(self._username, string_types) or not isinstance(self._password, string_types):
+        if not isinstance(self._username, str) or not isinstance(self._password, str):
             raise InvalidCredentialsException("Username/password not correctly specified")
 
         self.log.info('PTC User Login for: {}'.format(self._username))

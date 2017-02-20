@@ -23,17 +23,7 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-from __future__ import absolute_import
-
-import os
-import re
-import time
 import random
-import logging
-import requests
-import subprocess
-import six
-import binascii
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
@@ -46,11 +36,14 @@ except ImportError:
     HAVE_PYCRYPT = False
 
 from importlib import import_module
-from asyncio import TimeoutError
+from asyncio import ensure_future, TimeoutError
 from array import array
+from os import urandom
+from logging import getLogger
+from struct import Struct
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time, get_lib_paths, Rand
+from .utilities import to_camel_case, get_time_ms, get_lib_paths, Rand
 from .hash_library import HashLibrary
 from .hash_server import HashServer
 from .session import SessionManager
@@ -68,10 +61,13 @@ RPC_SESSIONS = SessionManager()
 
 class RpcApi:
     timeout = 15
-    signature_lib_path, hash_lib_path = get_lib_paths()
-    if not HAVE_PYCRYPT:
+    if HAVE_PYCRYPT:
+        signature_lib_path, hash_lib_path = None, None
+    else:
+        signature_lib_path, hash_lib_path = get_lib_paths(HAVE_PYCRYPT)
         _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
-    log = logging.getLogger(__name__)
+
+    log = getLogger(__name__)
 
     def __init__(self, auth_provider, device_info, state, proxy=None):
         self._auth_provider = auth_provider
@@ -94,25 +90,19 @@ class RpcApi:
         self.device_info = device_info
 
     def activate_hash_library(self):
+        if not self.hash_lib_path:
+            _, RpcApi.hash_lib_path = get_lib_paths(False, True)
+        self._hash_server = False
         self._hash_engine = HashLibrary(self.hash_lib_path)
 
     def activate_hash_server(self, auth_token):
+        self._hash_server = True
         self._hash_engine = HashServer(auth_token)
 
     def set_api_version(self, api_version):
         self._api_version = api_version
         if api_version > 0.45:
             self._encrypt_version = 3
-
-    def decode_raw(self, raw):
-        output = error = None
-        try:
-            process = subprocess.Popen(['protoc', '--decode_raw'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-            output, error = process.communicate(raw)
-        except (subprocess.SubprocessError, OSError):
-            output = "Couldn't find protoc in your environment OR other issue..."
-
-        return output
 
     def get_class(self, cls):
         module_, class_ = cls.rsplit('.', 1)
@@ -231,12 +221,16 @@ class RpcApi:
         sig = SignalLog()
 
         sig.field22 = self.state.session_hash
-        sig.epoch_timestamp_ms = get_time(ms=True)
+        sig.epoch_timestamp_ms = get_time_ms()
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
         if sig.timestamp_ms_since_start < 5000:
             sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
-        await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+        if self._hash_server:
+            await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+        else:
+            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+
         sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
         sig.location_hash = self._hash_engine.location_hash
         for req_hash in self._hash_engine.request_hashes:
@@ -245,8 +239,8 @@ class RpcApi:
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
 
-        sen.timestamp = random.randint(sig.timestamp_ms_since_start - 5000, sig.timestamp_ms_since_start - 100)
-        loc.timestamp_ms = random.randint(sig.timestamp_ms_since_start - 30000, sig.timestamp_ms_since_start - 1000)
+        sen.timestamp = sig.timestamp_ms_since_start - random.randint(100, 5000)
+        loc.timestamp_ms = sig.timestamp_ms_since_start - random.randint(1000, 30000)
 
         loc.name = 'fused'
         loc.latitude = request.latitude
@@ -337,7 +331,7 @@ class RpcApi:
             total_size = rounded_size + 5
             output = ctypes.POINTER(ctypes.c_ubyte * total_size)()
             output_size = self._signature_lib.encrypt(signature_plain, len(signature_plain), timestamp, ctypes.byref(output), self._encrypt_version)
-            signature = b''.join(list(map(lambda x: six.int2byte(x), output.contents)))
+            signature = b''.join(list(map(lambda x: Struct(">B").pack(x), output.contents)))
             return signature
 
     def _build_sub_requests(self, mainrequest, subrequest_list):
@@ -471,10 +465,10 @@ class RpcApi:
 
 class RpcState:
     def __init__(self):
-        self.start_time = get_time(ms=True)
+        self.start_time = get_time_ms()
         self.request = 1
         self.rand = Rand()
-        self.session_hash = os.urandom(16)
+        self.session_hash = urandom(16)
         self.course = random.uniform(0, 359.99)
 
     def request_id(self):
