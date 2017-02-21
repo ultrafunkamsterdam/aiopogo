@@ -227,14 +227,7 @@ class RpcApi:
             sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
         if self._hash_server:
-            await self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
-        else:
-            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
-
-        sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
-        sig.location_hash = self._hash_engine.location_hash
-        for req_hash in self._hash_engine.request_hashes:
-            sig.request_hashes.append(req_hash)
+            hashing = ensure_future(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
 
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
@@ -306,6 +299,16 @@ class RpcApi:
                 plat8.request_message = plat_eight.SerializeToString()
         except (IndexError, AttributeError):
             pass
+
+        if self._hash_server:
+            await hashing
+        else:
+            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+
+        sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
+        sig.location_hash = self._hash_engine.location_hash
+        for req_hash in self._hash_engine.request_hashes:
+            sig.request_hashes.append(req_hash)
 
         signature_proto = sig.SerializeToString()
         sig_request = SendEncryptedSignatureRequest()
