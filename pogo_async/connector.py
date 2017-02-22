@@ -19,7 +19,7 @@ class TimedConnection(Connection):
 
 
 class TimedConnector(TCPConnector):
-    _conn_duration = 8.5
+    _conn_duration = 7.5
 
     async def connect(self, req):
         """Get from pool or create new connection."""

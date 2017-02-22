@@ -14,7 +14,7 @@ from .connector import TimedConnector
 class HashServer:
     endpoint = "https://pokehash.buddyauth.com/api/v127_2/hash"
     status = {}
-    timeout = 15
+    timeout = 30
     _session = None
     loop = get_event_loop()
 

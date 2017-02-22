@@ -60,7 +60,7 @@ RPC_SESSIONS = SessionManager()
 
 
 class RpcApi:
-    timeout = 15
+    timeout = 30
     if HAVE_PYCRYPT:
         signature_lib_path, hash_lib_path = None, None
     else:

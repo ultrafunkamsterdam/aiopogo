@@ -11,7 +11,7 @@ except ImportError:
             raise ImportError('Install aiosocks to use socks proxies.')
     Socks4Addr = Socks5Addr = Socks5Auth = SocksConnector
 
-CONN_TIMEOUT = 6
+CONN_TIMEOUT = 10
 
 
 def socks_connector(proxy, loop=None):
