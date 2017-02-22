@@ -142,7 +142,12 @@ class RpcApi:
     @staticmethod
     def get_request_name(subrequests):
         try:
-            return to_camel_case(RequestType.Name(subrequests[0]))
+            first = subrequests[0]
+            if isinstance(first, dict):
+                num = tuple(first.keys())[0]
+            else:
+                num = first
+            return to_camel_case(RequestType.Name(num))
         except IndexError:
             return 'empty'
         except Exception:
