@@ -2,6 +2,7 @@ import asyncio
 
 from aiohttp import helpers
 from aiohttp.connector import Connection, TCPConnector
+from aiohttp.errors import ClientOSError, ClientTimeoutError
 
 
 class TimedConnection(Connection):
