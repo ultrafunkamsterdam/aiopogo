@@ -284,10 +284,7 @@ class RpcApi:
         sen.gravity_z = random.triangular(-1, .7, -0.7)
         sen.status = 3
 
-        if self._api_version == 0.45:
-            sig.version_hash = -1553869577012279119
-        else:
-            sig.version_hash = -816976800928766045
+        sig.version_hash = -816976800928766045
 
         if self.device_info:
             for key in self.device_info:
