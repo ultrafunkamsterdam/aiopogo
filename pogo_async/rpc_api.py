@@ -60,7 +60,6 @@ RPC_SESSIONS = SessionManager()
 
 
 class RpcApi:
-    timeout = 30
     if HAVE_PYCRYPT:
         signature_lib_path, hash_lib_path = None, None
     else:
@@ -114,7 +113,7 @@ class RpcApi:
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, timeout=self.timeout, proxy=self.proxy) as resp:
+            async with self._session.post(endpoint, data=request_proto_serialized, proxy=self.proxy) as resp:
                 resp.raise_for_status()
 
                 content = await resp.read()

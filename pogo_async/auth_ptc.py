@@ -50,7 +50,7 @@ class AuthPtc(Auth):
         self._username = username
         self._password = password
         self.user_agent = user_agent or 'pokemongo/0 CFNetwork/758.5.3 Darwin/15.6.0'
-        self.timeout = timeout or 5
+        self.timeout = timeout or 10
 
         if proxy and proxy.startswith('socks'):
             self.socks_proxy = proxy

@@ -14,7 +14,6 @@ from .connector import TimedConnector
 class HashServer:
     endpoint = "https://pokehash.buddyauth.com/api/v127_2/hash"
     status = {}
-    timeout = 30
     _session = None
     loop = get_event_loop()
 
@@ -40,7 +39,7 @@ class HashServer:
 
         # request hashes from hashing server
         try:
-            async with self._session.post(self.endpoint, headers=headers, data=payload, timeout=self.timeout) as resp:
+            async with self._session.post(self.endpoint, headers=headers, data=payload) as resp:
                 try:
                     resp.raise_for_status()
                 except HttpProcessingError as e:
@@ -93,7 +92,7 @@ class HashServer:
         conn = TimedConnector(loop=cls.loop,
                               limit=300,
                               verify_ssl=False,
-                              conn_timeout=5)
+                              conn_timeout=6)
         cls._session = ClientSession(connector=conn,
                                      loop=cls.loop,
                                      headers=headers)
