@@ -117,8 +117,6 @@ class RpcApi:
                 resp.raise_for_status()
 
                 content = await resp.read()
-                if not content:
-                    raise MalformedNianticResponseException('Empty server response!')
         except HttpProcessingError as e:
             if e.code == 400:
                 raise BadRequestException("400: Bad RPC request. {}".format(e.message))
@@ -135,7 +133,6 @@ class RpcApi:
         except (ClientError, DisconnectedError) as e:
             err = e.__cause__ or e
             raise NianticOfflineException('{} during RPC. {}'.format(err.__class__.__name__, e)) from e
-
         return content
 
     @staticmethod
@@ -344,7 +341,7 @@ class RpcApi:
         for entry in subrequest_list:
             if isinstance(entry, dict):
 
-                entry_id = list(entry.items())[0][0]
+                entry_id = tuple(entry.items())[0][0]
                 entry_content = entry[entry_id]
 
                 entry_name = RequestType.Name(entry_id)
@@ -408,7 +405,7 @@ class RpcApi:
         self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)
 
         response_proto_dict = protobuf_to_dict(response_proto)
-        response_proto_dict = self._parse_sub_responses(response_proto, subrequests, response_proto_dict)
+        response_proto_dict = self._parse_sub_responses(subrequests, response_proto_dict)
 
         if not response_proto_dict:
             raise MalformedNianticResponseException('Could not convert protobuf to dict.')
@@ -416,7 +413,7 @@ class RpcApi:
         return response_proto_dict
 
 
-    def _parse_sub_responses(self, response_proto, subrequests_list, response_proto_dict):
+    def _parse_sub_responses(self, subrequests_list, response_proto_dict):
         self.log.debug('Parsing sub RPC responses...')
         response_proto_dict['responses'] = {}
 
@@ -425,17 +422,12 @@ class RpcApi:
             exception.set_redirected_endpoint(response_proto_dict['api_url'])
             raise exception
 
-        if 'returns' in response_proto_dict:
-            del response_proto_dict['returns']
-
-        list_len = len(subrequests_list) - 1
-        i = 0
-        for subresponse in response_proto.returns:
+        for i, subresponse in enumerate(response_proto_dict['returns']):
             request_entry = subrequests_list[i]
             if isinstance(request_entry, int):
                 entry_id = request_entry
             else:
-                entry_id = list(request_entry.items())[0][0]
+                entry_id = tuple(request_entry.items())[0][0]
 
             entry_name = RequestType.Name(entry_id)
             proto_name = entry_name.lower() + '_response'
@@ -443,7 +435,6 @@ class RpcApi:
 
             self.log.debug("Parsing class: %s", proto_classname)
 
-            subresponse_return = None
             try:
                 subresponse_extension = self.get_class(proto_classname)()
             except Exception:
@@ -451,8 +442,7 @@ class RpcApi:
                 error = 'Protobuf definition for {} not found'.format(proto_classname)
                 subresponse_return = error
                 self.log.warning(error)
-
-            if subresponse_extension:
+            else:
                 try:
                     subresponse_extension.ParseFromString(subresponse)
                     subresponse_return = protobuf_to_dict(subresponse_extension)
@@ -462,7 +452,8 @@ class RpcApi:
                     self.log.warning(error)
 
             response_proto_dict['responses'][entry_name] = subresponse_return
-            i += 1
+
+        del response_proto_dict['returns']
 
         return response_proto_dict
 

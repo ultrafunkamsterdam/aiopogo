@@ -115,7 +115,6 @@ def get_format_time_diff(low, high, ms=True):
 def parse_api_endpoint(api_url):
     if not api_url.startswith("https"):
         api_url = 'https://{}/rpc'.format(api_url)
-
     return api_url
 
 

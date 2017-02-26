@@ -23,27 +23,22 @@ OR OTHER DEALINGS IN THE SOFTWARE.
 Author: tjado <https://github.com/tejado>
 """
 
-import re
 import logging
-import time
-
-logging.getLogger('aiohttp.client').setLevel(40)
 
 from . import __title__, __version__
 from .rpc_api import RpcApi, RpcState
 from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
-from .utilities import parse_api_endpoint, get_time
-from .exceptions import AuthException, AuthTokenExpiredException, BadRequestException, BannedAccountException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException, ServerBusyOrOfflineException, UnexpectedResponseException
+from .utilities import parse_api_endpoint
+from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException
 
-from . import protos
-from pogoprotos.networking.requests.request_type_pb2 import RequestType
+from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
 
 logger = logging.getLogger(__name__)
-
+logging.getLogger('aiohttp.client').setLevel(40)
 
 class PGoApi:
-    def __init__(self, provider=None, position_lat=None, position_lng=None, position_alt=None, proxy_config=None, device_info=None):
+    def __init__(self, provider=None, lat=None, lng=None, alt=None, proxy=None, device_info=None, hash_token=None):
         self.set_logger()
         self.log.info('%s v%s', __title__, __version__)
 
@@ -52,22 +47,22 @@ class PGoApi:
 
         self.set_api_endpoint("pgorelease.nianticlabs.com/plfe")
 
-        self._position_lat = position_lat
-        self._position_lng = position_lng
-        self._position_alt = position_alt
+        self._position_lat = lat
+        self._position_lng = lng
+        self._position_alt = alt
 
-        self._hash_server_token = None
-        self.proxy = proxy_config
+        self._hash_server_token = hash_token
+        self.proxy = proxy
         self.device_info = device_info
 
     def set_logger(self, logger=None):
         self.log = logger or logging.getLogger(__name__)
 
-    async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy_config=None, user_agent=None, timeout=None):
+    async def set_authentication(self, provider=None, oauth2_refresh_token=None, username=None, password=None, proxy=None, user_agent=None, timeout=None):
         if provider == 'ptc':
-            self._auth_provider = AuthPtc(proxy=proxy_config or self.proxy, user_agent=user_agent, timeout=timeout)
+            self._auth_provider = AuthPtc(proxy=proxy or self.proxy, user_agent=user_agent, timeout=timeout)
         elif provider == 'google':
-            self._auth_provider = AuthGoogle(proxy=proxy_config)
+            self._auth_provider = AuthGoogle(proxy=proxy)
         elif provider is None:
             self._auth_provider = None
         else:
@@ -82,7 +77,7 @@ class PGoApi:
             raise InvalidCredentialsException("Invalid Credential Input - Please provide username/password or an oauth2 refresh token")
 
     def get_position(self):
-        return (self._position_lat, self._position_lng, self._position_alt)
+        return self._position_lat, self._position_lng, self._position_alt
 
     def set_position(self, lat, lng, alt=None):
         self.log.debug('Set Position - Lat: %s Long: %s Alt: %s', lat, lng, alt)
@@ -91,8 +86,8 @@ class PGoApi:
         self._position_lng = lng
         self._position_alt = alt
 
-    def set_proxy(self, proxy_config):
-        self.proxy = proxy_config
+    def set_proxy(self, proxy):
+        self.proxy = proxy
 
     def get_api_endpoint(self):
         return self._api_endpoint
@@ -115,8 +110,8 @@ class PGoApi:
                                 self._hash_server_token)
         return request
 
-    def activate_hash_server(self, hash_server_token):
-        self._hash_server_token = hash_server_token
+    def activate_hash_server(self, hash_token):
+        self._hash_server_token = hash_token
 
     def get_hash_server_token(self):
         return self._hash_server_token
@@ -124,7 +119,7 @@ class PGoApi:
     async def __getattr__(self, func):
         async def function(**kwargs):
             request = self.create_request()
-            getattr(request, func)(_call_direct=True, **kwargs )
+            getattr(request, func)(_call_direct=True, **kwargs)
             return await request.call()
 
         if func.upper() in RequestType.keys():
@@ -134,8 +129,8 @@ class PGoApi:
 
 
 class PGoApiRequest:
-    def __init__(self, parent, position_lat, position_lng, position_alt,
-                 device_info=None, proxy_config=None, hash_token=None):
+    def __init__(self, parent, lat, lng, alt, device_info=None, proxy=None,
+                 hash_token=None):
         self.log = logging.getLogger(__name__)
 
         self.__parent__ = parent
@@ -145,11 +140,11 @@ class PGoApiRequest:
         self._auth_provider = self.__parent__.get_auth_provider()
         self._state = self.__parent__.get_state()
 
-        self._position = (position_lat, position_lng, position_alt)
+        self._position = (lat, lng, alt)
 
         self._req_method_list = []
         self.device_info = device_info
-        self.proxy = proxy_config
+        self.proxy = proxy
         self.hash_token = hash_token
 
     async def call(self):
@@ -207,12 +202,9 @@ class PGoApiRequest:
 
     def __getattr__(self, func):
         def function(**kwargs):
-
             if '_call_direct' in kwargs:
                 del kwargs['_call_direct']
-                self.log.debug('Creating a new direct request...')
-            elif not self._req_method_list:
-                self.log.debug('Creating a new request...')
+            self.log.debug('Creating a new request...')
 
             name = func.upper()
             if kwargs:
