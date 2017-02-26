@@ -122,20 +122,13 @@ class Rand:
     '''Lehmer random number generator'''
     M = 0x7fffffff  # 2^31 - 1 (A large prime number)
     A = 16807       # Prime root of M
-    Q = 127773      # M // A (To avoid overflow on A * seed)
-    R = 2836        # M % A (To avoid overflow on A * seed)
 
-    def __init__(self, seed=1):
+    def __init__(self, seed=16807):
         self.seed = seed
         self.request = 1
 
     def next(self):
-        hi = self.seed // self.Q
-        lo = self.seed % self.Q
-        t = self.A * lo - self.R * hi
-        if t < 0:
-            t += self.M
-        self.seed = t % 0x80000000
+        self.seed = (self.seed * self.A) % self.M
         return self.seed
 
 
