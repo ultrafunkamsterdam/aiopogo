@@ -25,29 +25,29 @@ Author: tjado <https://github.com/tejado>
 
 from pogo_async.exceptions import PleaseInstallProtobufVersion3
 
-import pkg_resources
 import logging
 
 __title__ = 'pogo_async'
 __version__ = '1.1'
 __author__ = 'Noctem'
 __license__ = 'MIT License'
-__copyright__ = 'Copyright (c) 2016 tjado <https://github.com/tejado>'
+__copyright__ = 'Copyright (c) 2017 Noctem <https://github.com/Noctem>'
 
 protobuf_exist = False
 protobuf_version = 0
 try:
-    protobuf_version = pkg_resources.get_distribution("protobuf").version
+    from google import protobuf
+    protobuf_version = protobuf.__version__
     protobuf_exist = True
-except Exception:
-    pass
+except ImportError:
+    raise PleaseInstallProtobufVersion3('Protobuf not found, install it.')
 
-if (not protobuf_exist) or (int(protobuf_version[:1]) < 3):
-    raise PleaseInstallProtobufVersion3()
+if int(protobuf_version[:1]) < 3:
+    raise PleaseInstallProtobufVersion3('Protobuf 3 needed, you have {}'.format(protobuf_version))
 
-from pogo_async.pgoapi import PGoApi
-from pogo_async.rpc_api import RpcApi, RPC_SESSIONS
-from pogo_async.auth import Auth
+from .pgoapi import PGoApi
+from .rpc_api import RpcApi, RPC_SESSIONS
+from .auth import Auth
 from .hash_server import HashServer
 
 def close_sessions():
