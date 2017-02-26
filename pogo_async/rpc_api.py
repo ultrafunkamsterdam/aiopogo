@@ -422,7 +422,13 @@ class RpcApi:
             exception.set_redirected_endpoint(response_proto_dict['api_url'])
             raise exception
 
-        for i, subresponse in enumerate(response_proto_dict['returns']):
+        try:
+            subresponses = response_proto_dict['returns']
+            del response_proto_dict['returns']
+        except KeyError:
+            return response_proto_dict
+
+        for i, subresponse in enumerate(subresponses):
             request_entry = subrequests_list[i]
             if isinstance(request_entry, int):
                 entry_id = request_entry
@@ -452,8 +458,6 @@ class RpcApi:
                     self.log.warning(error)
 
             response_proto_dict['responses'][entry_name] = subresponse_return
-
-        del response_proto_dict['returns']
 
         return response_proto_dict
 
