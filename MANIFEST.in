@@ -1,4 +1,0 @@
-recursive-include pogo_async *.py
-
-global-exclude *.pyc
-global-exclude *.pyo

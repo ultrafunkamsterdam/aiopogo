@@ -1,7 +1,7 @@
 import ctypes
 import struct
 
-from pogo_async.utilities import d2h
+from .utilities import d2h
 
 HASH_SEED = 0x46E945F8  # static hash seed from app
 

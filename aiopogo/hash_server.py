@@ -2,9 +2,9 @@ import json
 
 from ctypes import c_int32, c_int64
 from base64 import b64encode
-from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
-
 from asyncio import get_event_loop, TimeoutError
+
+from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .utilities import JSONByteEncoder
@@ -88,7 +88,7 @@ class HashServer:
             return
         headers = {'content-type': 'application/json',
                    'Accept': 'application/json',
-                   'User-Agent': 'Python pogo_async'}
+                   'User-Agent': 'Python aiopogo'}
         conn = TimedConnector(loop=cls.loop,
                               limit=300,
                               verify_ssl=False,

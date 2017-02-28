@@ -10,13 +10,22 @@ install_reqs = parse_requirements(path_req, session=False)
 
 reqs = [str(ir.req) for ir in install_reqs]
 
-setup(name='pogo_async',
-      author = 'Noctem',
-      description = 'Asynchronous Pokemon Go API lib',
-      version = '1.1',
-      url = 'https://github.com/Noctem/pgoapi',
-      download_url = "https://github.com/Noctem/pgoapi/releases",
+setup(name='aiopogo',
+      author = 'David Christenson',
+      author_email='mail@noctem.xyz',
+      description = 'Asynchronous Pokemon API lib',
+      version = '1.2',
+      url = 'https://github.com/Noctem/aiopogo',
       packages = find_packages(),
       install_requires = reqs,
-      package_data={'pogo_async': ['lib/*']}
-      )
+      package_data={'aiopogo': ['lib/*.so', 'lib/*.dylib', 'lib/*.dll']},
+      classifiers=[
+          'Development Status :: 5 - Production/Stable',
+          'Intended Audience :: Developers',
+          'Operating System :: OS Independent',
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'License :: OSI Approved :: MIT License'
+      ]
+)
