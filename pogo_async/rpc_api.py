@@ -28,12 +28,7 @@ import random
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientError, DisconnectedError, HttpProcessingError
-try:
-    from pycrypt import pycrypt
-    HAVE_PYCRYPT = True
-except ImportError:
-    import ctypes
-    HAVE_PYCRYPT = False
+from pycrypt import pycrypt
 
 from importlib import import_module
 from asyncio import ensure_future, TimeoutError
@@ -43,7 +38,7 @@ from logging import getLogger
 from struct import Struct
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time_ms, get_lib_paths, Rand
+from .utilities import to_camel_case, get_time_ms, get_lib_path, Rand
 from .hash_library import HashLibrary
 from .hash_server import HashServer
 from .session import SessionManager
@@ -60,12 +55,7 @@ RPC_SESSIONS = SessionManager()
 
 
 class RpcApi:
-    if HAVE_PYCRYPT:
-        signature_lib_path, hash_lib_path = None, None
-    else:
-        signature_lib_path, hash_lib_path = get_lib_paths(HAVE_PYCRYPT)
-        _signature_lib = ctypes.cdll.LoadLibrary(signature_lib_path)
-
+    hash_lib_path = None
     log = getLogger(__name__)
 
     def __init__(self, auth_provider, device_info, state, proxy=None):
@@ -90,7 +80,7 @@ class RpcApi:
 
     def activate_hash_library(self):
         if not self.hash_lib_path:
-            _, RpcApi.hash_lib_path = get_lib_paths(False, True)
+            RpcApi.hash_lib_path = get_lib_path()
         self._hash_server = False
         self._hash_engine = HashLibrary(self.hash_lib_path)
 
@@ -310,7 +300,7 @@ class RpcApi:
 
         signature_proto = sig.SerializeToString()
         sig_request = SendEncryptedSignatureRequest()
-        sig_request.encrypted_signature = self._generate_signature(signature_proto, sig.timestamp_ms_since_start)
+        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start, self._encrypt_version)
         plat = request.platform_requests.add()
         plat.type = 6
         plat.request_message = sig_request.SerializeToString()
@@ -320,20 +310,6 @@ class RpcApi:
         self.log.debug('Generated protobuf request: \n\r%s', request)
 
         return request
-
-    if HAVE_PYCRYPT:
-        def _generate_signature(self, signature, timestamp):
-            return pycrypt(signature, timestamp, self._encrypt_version)
-    else:
-        def _generate_signature(self, signature_plain, timestamp):
-            self._signature_lib.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.POINTER(ctypes.POINTER(ctypes.c_ubyte)), ctypes.c_char]
-            self._signature_lib.restype = ctypes.c_int
-            rounded_size = len(signature_plain) + (256 - (len(signature_plain) % 256))
-            total_size = rounded_size + 5
-            output = ctypes.POINTER(ctypes.c_ubyte * total_size)()
-            output_size = self._signature_lib.encrypt(signature_plain, len(signature_plain), timestamp, ctypes.byref(output), self._encrypt_version)
-            signature = b''.join(list(map(lambda x: Struct(">B").pack(x), output.contents)))
-            return signature
 
     def _build_sub_requests(self, mainrequest, subrequest_list):
         self.log.debug('Generating sub RPC requests...')

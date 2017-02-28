@@ -1,3 +1,4 @@
 [submodule "pogo_async/lib"]
 	path = pogo_async/lib
 	url = https://github.com/pokelibs/pgoapi-libs.git
+	branch = hash-only
