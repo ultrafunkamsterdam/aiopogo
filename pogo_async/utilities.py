@@ -127,6 +127,10 @@ class Rand:
         self.seed = (self.seed * self.A) % self.M
         return self.seed
 
+    def request_id(self):
+        self.request += 1
+        return (self.next() << 32) | self.request
+
 
 def get_lib_path():
     # win32 doesn't necessarily mean 32 bits

@@ -188,7 +188,7 @@ class RpcApi:
         request = RequestEnvelope()
         request.status_code = 2
 
-        request.request_id = self.state.request_id()
+        request.request_id = self.state.rand.request_id()
         request.accuracy = random.choice((5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66, 80)))
 
         if player_position:
@@ -441,15 +441,9 @@ class RpcApi:
 class RpcState:
     def __init__(self):
         self.start_time = get_time_ms()
-        self.request = 1
         self.rand = Rand()
         self.session_hash = urandom(16)
         self.course = random.uniform(0, 359.99)
-
-    def request_id(self):
-        self.request += 1
-        r = self.rand.next()
-        return (r << 32) | self.request
 
     def get_course(self):
         self.course = random.triangular(0, 359.99, self.course)
