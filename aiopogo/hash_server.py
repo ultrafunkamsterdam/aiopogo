@@ -12,7 +12,7 @@ from .connector import TimedConnector
 
 
 class HashServer:
-    endpoint = "https://pokehash.buddyauth.com/api/v127_2/hash"
+    endpoint = "https://pokehash.buddyauth.com/api/v127_3/hash"
     status = {}
     _session = None
     loop = get_event_loop()
