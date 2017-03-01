@@ -25,6 +25,7 @@ from networking.requests.request_type_pb2 import RequestType
 from networking.envelopes.signal_log_pb2 import SignalLog
 from networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
 from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
+from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
 
 RPC_SESSIONS = SessionManager()
 
@@ -256,7 +257,8 @@ class RpcApi:
         try:
             if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
                 plat_eight = PlatEightRequest()
-                plat_eight.field1 = '90f6a704505bccac73cec99b07794993e6fd5a12'
+                if self.state.message8:
+                    plat_eight.field1 = self.state.message8
                 plat8 = request.platform_requests.add()
                 plat8.type = 8
                 plat8.request_message = plat_eight.SerializeToString()
@@ -358,6 +360,14 @@ class RpcApi:
         response_proto_dict = protobuf_to_dict(response_proto)
         response_proto_dict = self._parse_sub_responses(subrequests, response_proto_dict)
 
+        if not self.state.message8 and 'platform_returns' in response_proto_dict:
+            for plat_response in response_proto_dict['platform_returns']:
+                if plat_response['type'] == 8:
+                    resp = PlatEightResponse()
+                    resp.ParseFromString(plat_response['response'])
+                    self.state.message8 = resp.message
+                    break
+
         if not response_proto_dict:
             raise MalformedNianticResponseException('Could not convert protobuf to dict.')
 
@@ -419,6 +429,7 @@ class RpcState:
         self.rand = Rand()
         self.session_hash = urandom(16)
         self.course = random.uniform(0, 359.99)
+        self.message8 = None
 
     def get_course(self):
         self.course = random.triangular(0, 359.99, self.course)
