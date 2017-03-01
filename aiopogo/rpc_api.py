@@ -6,6 +6,7 @@ from array import array
 from os import urandom
 from logging import getLogger
 from struct import Struct
+from enum import Enum
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
@@ -41,7 +42,6 @@ class RpcApi:
         self._hash_engine = None
         self._api_version = 0.45
         self._encrypt_version = 2
-        self.request_proto = None
         if proxy and proxy.startswith('socks'):
             self._session = RPC_SESSIONS.get(proxy)
             self.proxy = None
@@ -120,9 +120,9 @@ class RpcApi:
         if not self._auth_provider or self._auth_provider.is_login() is False:
             raise NotLoggedInException
 
-        self.request_proto = self.request_proto or await self._build_main_request(subrequests, player_position)
+        request_proto = await self._build_main_request(subrequests, player_position)
 
-        response = await self._make_rpc(endpoint, self.request_proto)
+        response = await self._make_rpc(endpoint, request_proto)
         response_dict = self._parse_main_response(response, subrequests)
 
         self.check_authentication(response_dict)
@@ -130,21 +130,25 @@ class RpcApi:
         # some response validations
         try:
             status_code = response_dict['status_code']
+            if status_code in (1, 2):
+                return response_dict
+
             if status_code == 102:
                 raise AuthTokenExpiredException
-            elif status_code == 52:
-                req_type = self.get_request_name(subrequests)
-                raise NianticThrottlingException("Request throttled on {} request.".format(req_type))
             elif status_code == 53:
                 api_url = response_dict['api_url']
                 exception = ServerApiEndpointRedirectException()
                 exception.set_redirected_endpoint(api_url)
                 raise exception
-        except TypeError:
+            else:
+                err = StatusCode(status_code).name
+                req_type = self.get_request_name(subrequests)
+                raise InvalidRPCException("{} on {}.".format(err, req_type))
+        except ValueError:
+            raise UnexpectedResponseException("Unknown status_code: {}".format(status_code))
+        except (TypeError, KeyError):
             req_type = self.get_request_name(subrequests)
             raise UnexpectedResponseException('Could not parse status_code from {} response.'.format(req_type))
-
-        return response_dict
 
     def check_authentication(self, response_dict):
         try:
@@ -378,7 +382,7 @@ class RpcApi:
         self.log.debug('Parsing sub RPC responses...')
         response_proto_dict['responses'] = {}
 
-        if response_proto_dict.get('status_code', 1) == 53:
+        if response_proto_dict['status_code'] == 53:
             exception = ServerApiEndpointRedirectException()
             exception.set_redirected_endpoint(response_proto_dict['api_url'])
             raise exception
@@ -434,3 +438,15 @@ class RpcState:
     def get_course(self):
         self.course = random.triangular(0, 359.99, self.course)
         return self.course
+
+
+class StatusCode(Enum):
+    Unknown = 0
+    Okay = 1
+    OkayWithURL = 2
+    BadRequest = 3
+    InvalidRequest = 51
+    InvalidPlatformRequest = 52
+    Redirect = 53
+    SessionInvalidated = 100
+    InvalidAuthToken = 102

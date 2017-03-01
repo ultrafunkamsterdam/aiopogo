@@ -155,7 +155,6 @@ class PGoApiRequest:
                 self.log.info('Access Token rejected! Requesting new one...')
                 await self._auth_provider.get_access_token(force_refresh=True)
 
-                request.request_proto = None  # reset request and rebuild
                 execute = True  # reexecute the call
             except ServerApiEndpointRedirectException as e:
                 self.log.debug('API Endpoint redirect... re-execution of call')

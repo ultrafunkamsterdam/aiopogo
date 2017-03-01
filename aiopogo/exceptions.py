@@ -42,6 +42,9 @@ class BadRequestException(PgoapiError):
 class BadHashRequestException(BadRequestException, HashServerException):
     """Raised when hashing server returns code 400"""
 
+class InvalidRPCException(BadRequestException):
+    """Raised when an invalid RPC is made."""
+
 
 class BannedAccountException(PgoapiError):
     """Raised when an account is banned"""
