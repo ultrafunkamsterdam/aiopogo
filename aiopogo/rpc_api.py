@@ -1,7 +1,5 @@
-import random
-
 from importlib import import_module
-from asyncio import ensure_future, TimeoutError
+from asyncio import TimeoutError
 from array import array
 from os import urandom
 from logging import getLogger
@@ -14,7 +12,7 @@ from aiohttp import ClientError, DisconnectedError, HttpProcessingError
 from pycrypt import pycrypt
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time_ms, get_lib_path, Rand
+from .utilities import to_camel_case, get_time_ms, get_lib_path, IdGenerator, CustomRandom
 from .hash_library import HashLibrary
 from .hash_server import HashServer
 from .session import SessionManager
@@ -28,7 +26,9 @@ from networking.platform.requests.send_encrypted_signature_request_pb2 import Se
 from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
 
+
 RPC_SESSIONS = SessionManager()
+rand = CustomRandom()
 
 
 class RpcApi:
@@ -49,9 +49,7 @@ class RpcApi:
             self._session = RPC_SESSIONS.get()
             self.proxy = proxy
 
-        # data fields for SignalAgglom
-        self.token2 = random.randint(1, 59)
-
+        self.token2 = None
         self.device_info = device_info
 
     def activate_hash_library(self):
@@ -168,13 +166,19 @@ class RpcApi:
         request = RequestEnvelope()
         request.status_code = 2
 
-        request.request_id = self.state.rand.request_id()
-        request.accuracy = random.choice((5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10, 10, 30, 30, 50, 65, random.uniform(66, 80)))
+        request.request_id = self.state.id_gen.request_id()
+
+        # 5: 43%, 10: 30%, 30: 5%, 50: 4%, 65: 10%, 200: 1%, float: 7%
+        request.accuracy = rand.choose_weighted(
+            (5, 10, 30, 50, 65, 200, -1),
+            (43, 73, 78, 82, 92, 93, 100))
+        if request.accuracy == -1:
+            request.accuracy = rand.uniform(65, 200)
 
         if player_position:
             request.latitude, request.longitude, altitude = player_position
 
-        # generate sub requests before Signature generation
+        # generate sub requests before SignalLog generation
         request = self._build_sub_requests(request, subrequests)
 
         ticket = self._auth_provider.get_ticket()
@@ -186,6 +190,12 @@ class RpcApi:
             self.log.debug('No Session Ticket found - using OAUTH Access Token')
             request.auth_info.provider = self._auth_provider.get_name()
             request.auth_info.token.contents = await self._auth_provider.get_access_token()
+
+            if not self.token2:
+                # 59: 50%, others: 5% each
+                self.token2 = rand.choose_weighted(
+                    (4, 19, 22, 26, 30, 44, 45, 50, 57, 58, 59),
+                    (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20))
             request.auth_info.token.unknown2 = self.token2
             ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
 
@@ -193,81 +203,108 @@ class RpcApi:
 
         sig.field22 = self.state.session_hash
         sig.epoch_timestamp_ms = get_time_ms()
+        if not self.state.start_time:
+            self.state.start_time = sig.epoch_timestamp_ms - rand.randint(6000, 10000)
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
-        if sig.timestamp_ms_since_start < 5000:
-            sig.timestamp_ms_since_start = random.randint(5000, 8000)
 
         if self._hash_server:
-            hashing = ensure_future(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
+            loop = HashServer.loop
+            hashing = loop.create_task(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
 
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
 
-        sen.timestamp = sig.timestamp_ms_since_start - random.randint(100, 5000)
-        loc.timestamp_ms = sig.timestamp_ms_since_start - random.randint(1000, 30000)
+        sen.timestamp = sig.timestamp_ms_since_start - rand.triangular_int(93, 4900, 3000)
+        loc.timestamp_ms = sig.timestamp_ms_since_start - rand.triangular_int(320, 3000, 1000)
 
         loc.name = 'fused'
         loc.latitude = request.latitude
         loc.longitude = request.longitude
 
-        loc.altitude = altitude or random.triangular(300, 400, 350)
+        loc.altitude = altitude or rand.uniform(150, 250)
 
-        if random.random() > .95:
-            # no reading for roughly 1 in 20 updates
+        if rand.random() > .85:
+            # no reading for roughly 1 in 7 updates
             loc.device_course = -1
             loc.device_speed = -1
         else:
-            loc.device_course = self.state.get_course()
-            loc.device_speed = random.triangular(0.2, 4.25, 1)
+            loc.device_course = self.state.course
+            loc.device_speed = rand.triangular(0.25, 9.7, 8.2)
 
         loc.provider_status = 3
         loc.location_type = 1
-        if request.accuracy >= 65:
-            loc.vertical_accuracy = random.triangular(35, 100, 65)
-            loc.horizontal_accuracy = random.choice((request.accuracy, 65, 65, random.uniform(66,80), 200))
+        if isinstance(request.accuracy, float):
+            loc.horizontal_accuracy = rand.choose_weighted((request.accuracy, 65, 200), (50, 90, 100))
+            loc.vertical_accuracy = rand.choose_weighted(
+                (-1, 10, 12, 16, 24, 32, 48, 96),
+                (50, 84, 89, 92, 96, 98, 99, 100))
         else:
-            if request.accuracy > 10:
-                loc.vertical_accuracy = random.choice((24, 32, 48, 48, 64, 64, 96, 128))
-            else:
-                loc.vertical_accuracy = random.choice((3, 4, 6, 6, 6, 6, 8, 12, 24))
             loc.horizontal_accuracy = request.accuracy
+            if request.accuracy >= 10:
+                loc.vertical_accuracy = rand.choose_weighted(
+                    (6, 8, 10, 12, 16, 24, 32, 48),
+                    (4, 38, 73, 84, 88, 96, 99, 100))
+            else:
+                loc.vertical_accuracy = rand.choose_weighted(
+                    (3, 4, 6, 8, 10, 12),
+                    (15, 54, 68, 81, 95, 100))
 
-        sen.acceleration_x = random.triangular(-1.7, 1.2, 0)
-        sen.acceleration_y = random.triangular(-1.4, 1.9, 0)
-        sen.acceleration_z = random.triangular(-1.4, .9, 0)
-        sen.magnetic_field_x = random.triangular(-54, 50, 0)
-        sen.magnetic_field_y = random.triangular(-51, 57, -4.8)
-        sen.magnetic_field_z = random.triangular(-56, 43, -30)
-        sen.magnetic_field_accuracy = random.choice((-1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2))
-        sen.attitude_pitch = random.triangular(-1.5, 1.5, 0.4)
-        sen.attitude_yaw = random.triangular(-3.1, 3.1, .198)
-        sen.attitude_roll = random.triangular(-2.8, 3.04, 0)
-        sen.rotation_rate_x = random.triangular(-4.7, 3.9, 0)
-        sen.rotation_rate_y = random.triangular(-4.7, 4.3, 0)
-        sen.rotation_rate_z = random.triangular(-4.7, 6.5, 0)
-        sen.gravity_x = random.triangular(-1, 1, 0)
-        sen.gravity_y = random.triangular(-1, 1, -.2)
-        sen.gravity_z = random.triangular(-1, .7, -0.7)
+        if loc.vertical_accuracy == -1:
+            loc.vertical_accuracy = rand.uniform(10, 96)
+
+        sen.acceleration_x = rand.triangular(-1.5, 2.5, 0)
+        sen.acceleration_y = rand.triangular(-1.2, 1.4, 0)
+        sen.acceleration_z = rand.triangular(-1.4, .9, 0)
+        sen.magnetic_field_accuracy = rand.choose_weighted(
+            (-1, 0, 1, 2),
+            (8, 10, 52, 100))
+        if sen.magnetic_field_accuracy == -1:
+            sen.magnetic_field_x = 0
+            sen.magnetic_field_y = 0
+            sen.magnetic_field_z = 0
+        else:
+            sen.magnetic_field_x = self.state.magnetic_field_x
+            sen.magnetic_field_y = self.state.magnetic_field_y
+            sen.magnetic_field_z = self.state.magnetic_field_z
+
+        sen.attitude_pitch = rand.triangular(-1.56, 1.57, 0.475)
+        sen.attitude_yaw = rand.triangular(-1.56, 3.14, .1)
+        sen.attitude_roll = rand.triangular(-3.14, 3.14, 0)
+        sen.rotation_rate_x = rand.triangular(-3.2, 3.52, 0)
+        sen.rotation_rate_y = rand.triangular(-3.1, 4.88, 0)
+        sen.rotation_rate_z = rand.triangular(-6, 3.7, 0)
+        sen.gravity_x = rand.triangular(-1, 1, 0.01)
+        sen.gravity_y = rand.triangular(-1, 1, -.4)
+        sen.gravity_z = rand.triangular(-1, 1, -.4)
         sen.status = 3
 
         sig.version_hash = -816976800928766045
 
-        if self.device_info:
+        try:
             for key in self.device_info:
                 setattr(sig.device_info, key, self.device_info[key])
-            if self.device_info.get('brand', 'Apple') == 'Apple':
-                sig.ios_device_info.bool5 = True
+        except TypeError:
+            pass
+        sig.ios_device_info.bool5 = True
 
         try:
-            if request.requests[0].request_type in (RequestType.Value('GET_MAP_OBJECTS'), RequestType.Value('GET_PLAYER')):
-                plat_eight = PlatEightRequest()
-                if self.state.message8:
-                    plat_eight.field1 = self.state.message8
-                plat8 = request.platform_requests.add()
-                plat8.type = 8
-                plat8.request_message = plat_eight.SerializeToString()
+            rtype = request.requests[0].request_type
         except (IndexError, AttributeError):
             pass
+        else:
+            randval = rand.random()
+            # GetMapObjects or GetPlayer: 50%
+            # Encounter: 10%
+            # Others: 3%
+            if ((rtype in (2, 106) and randval > 0.5)
+                    or (rtype == 102 and randval > 0.9)
+                    or randval > 0.97):
+                plat8 = PlatEightRequest()
+                if self.state.message8:
+                    plat8.field1 = self.state.message8
+                plat = request.platform_requests.add()
+                plat.type = 8
+                plat.request_message = plat8.SerializeToString()
 
         if self._hash_server:
             await hashing
@@ -286,10 +323,9 @@ class RpcApi:
         plat.type = 6
         plat.request_message = sig_request.SerializeToString()
 
-        request.ms_since_last_locationfix = int(random.triangular(300, 30000, 10000))
+        request.ms_since_last_locationfix = sig.timestamp_ms_since_start - loc.timestamp_ms
 
         self.log.debug('Generated protobuf request: \n\r%s', request)
-
         return request
 
     def _build_sub_requests(self, mainrequest, subrequest_list):
@@ -297,7 +333,6 @@ class RpcApi:
 
         for entry in subrequest_list:
             if isinstance(entry, dict):
-
                 entry_id = tuple(entry.items())[0][0]
                 entry_content = entry[entry_id]
 
@@ -429,15 +464,35 @@ class RpcApi:
 
 class RpcState:
     def __init__(self):
-        self.start_time = get_time_ms()
-        self.rand = Rand()
+        self.start_time = None
+        self.id_gen = IdGenerator()
         self.session_hash = urandom(16)
-        self.course = random.uniform(0, 359.99)
+        self.mag_x_min = rand.uniform(-80, 60)
+        self.mag_x_max = self.mag_x_min + 20
+        self.mag_y_min = rand.uniform(-120, 90)
+        self.mag_y_max = self.mag_y_min + 30
+        self.mag_z_min = rand.uniform(-70, 40)
+        self.mag_z_max = self.mag_y_min + 15
+        self._course = rand.uniform(0, 359.99)
         self.message8 = None
+        self.first_request = None
 
-    def get_course(self):
-        self.course = random.triangular(0, 359.99, self.course)
-        return self.course
+    @property
+    def magnetic_field_x(self):
+        return rand.uniform(self.mag_x_min, self.mag_x_max)
+
+    @property
+    def magnetic_field_y(self):
+        return rand.uniform(self.mag_y_min, self.mag_y_max)
+
+    @property
+    def magnetic_field_z(self):
+        return rand.uniform(self.mag_z_min, self.mag_z_max)
+
+    @property
+    def course(self):
+        self._course = rand.triangular(0, 359.99, self._course)
+        return self._course
 
 
 class StatusCode(Enum):

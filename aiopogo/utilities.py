@@ -9,6 +9,8 @@ from binascii import unhexlify
 from math import pi
 from array import array
 from logging import getLogger
+from random import Random
+from bisect import bisect
 
 EARTH_RADIUS = 6371009  # radius of Earth in meters
 try:
@@ -93,7 +95,7 @@ def parse_api_endpoint(api_url):
     return api_url
 
 
-class Rand:
+class IdGenerator:
     '''Lehmer random number generator'''
     M = 0x7fffffff  # 2^31 - 1 (A large prime number)
     A = 16807       # Prime root of M
@@ -109,6 +111,36 @@ class Rand:
     def request_id(self):
         self.request += 1
         return (self.next() << 32) | self.request
+
+
+class CustomRandom(Random):
+    def choose_weighted(self, population, cum_weights):
+        """Return an item from population according to provided weights.
+        """
+        if len(cum_weights) != len(population):
+            raise ValueError('The number of weights does not match the population')
+        total = cum_weights[-1]
+        return population[bisect(cum_weights, self.random() * total)]
+
+    def triangular_int(self, low, high, mode):
+        """Triangular distribution.
+
+        Continuous distribution bounded by given lower and upper limits,
+        and having a given mode value in-between.
+
+        http://en.wikipedia.org/wiki/Triangular_distribution
+
+        """
+        u = self.random()
+        try:
+            c = (mode - low) / (high - low)
+        except ZeroDivisionError:
+            return low
+        if u > c:
+            u = 1 - u
+            c = 1 - c
+            low, high = high, low
+        return int(low + (high - low) * (u * c) ** 0.5)
 
 
 def get_lib_path():
