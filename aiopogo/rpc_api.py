@@ -402,9 +402,12 @@ class RpcApi:
         if not self.state.message8 and 'platform_returns' in response_proto_dict:
             for plat_response in response_proto_dict['platform_returns']:
                 if plat_response['type'] == 8:
-                    resp = PlatEightResponse()
-                    resp.ParseFromString(plat_response['response'])
-                    self.state.message8 = resp.message
+                    try:
+                        resp = PlatEightResponse()
+                        resp.ParseFromString(plat_response['response'])
+                        self.state.message8 = resp.message
+                    except KeyError:
+                        pass
                     break
 
         if not response_proto_dict:
