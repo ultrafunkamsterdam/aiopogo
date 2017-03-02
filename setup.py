@@ -1,23 +1,21 @@
 #!/usr/bin/env python
 
-import os
 from setuptools import setup, find_packages
-from pip.req import parse_requirements
-
-setup_dir = os.path.dirname(os.path.realpath(__file__))
-path_req = os.path.join(setup_dir, 'requirements.txt')
-install_reqs = parse_requirements(path_req, session=False)
-
-reqs = [str(ir.req) for ir in install_reqs]
 
 setup(name='aiopogo',
       author = 'David Christenson',
       author_email='mail@noctem.xyz',
       description = 'Asynchronous Pokemon API lib',
-      version = '1.2.1',
+      version = '1.3.0',
       url = 'https://github.com/Noctem/aiopogo',
       packages = find_packages(),
-      install_requires = reqs,
+      install_requires = [
+          'protobuf>=3.0.0',
+          'gpsoauth>=0.4.0',
+          'protobuf3-to-dict>=0.1.4',
+          'aiohttp==1.3.*',
+          'pycrypt>=0.1.1',
+          'pogeo>=0.2.0'],
       package_data={'aiopogo': ['lib/*.so', 'lib/*.dylib', 'lib/*.dll']},
       classifiers=[
           'Development Status :: 5 - Production/Stable',
