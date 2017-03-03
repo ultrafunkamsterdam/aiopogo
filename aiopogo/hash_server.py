@@ -10,7 +10,7 @@ from .connector import TimedConnector
 try:
     import ujson as json
 
-    jargs = {'escape_forward_slashes': False}
+    jargs = {'double_precision': 17, 'escape_forward_slashes': False}
     jexc = ValueError
 except ImportError:
     import json
