@@ -7,12 +7,3 @@ install:
 - python setup.py install
 script:
 - python -c 'import aiopogo'
-deploy:
-  provider: pypi
-  user: Noctem
-  password:
-    secure: WHnVJnKCR7qzrW2vufYu6X+VFj2E5dRfBuSBeckoddP7J4ggE2XSORz8aqVyDNVzLD/+F/SKlFyqrYCvtooJwMtSRFVLdhmHgF+yfI+c42nWyUMPjZHlEZ7DorDykh/iwqX6cmIzxnSUdyZQthtPezQNFPP54tahUFHSbw6v+n48qPVHX60U6p97vZN995hMcskRNAdTXfoAzE/nXdjEqnG5JfrAjPdIMX0+8bab4qI6NiBdPrC4iNfe7zXJjvdh1IlkWbaIEp53/PTWjmE04IrEO44gWklJZVvzlAz2GWyK40mj45E+E4dIdLdrkUAJvzlXREYhAv1ImgGxND2y+BP9sFVBMlUxZsCLF8uh0kcdzE013Z0lwtzUQBhS/ukPEefzq4cGAhYDZtL4lW6NvGGDugq7gXzSbTtpxm3w/kMt4fDduJa7lz58S7fq6tHeml7DB8vLNWlQBv5ezcClPo7i4mNo7tEE8+2IStuCOTPgqGm8Hfi+3nqsBnYJCiHL9GAe2V6eP2eaNsb/HpDa20MI9pNz4iFXfNUYrzd3Xs2hS2ELkmg708487KytTdhroZOmgsiz99JCBJIWYT5GVtQYaP7LDUoF75TJo1hqMFpADOSwgCcZDjoup4tkBV3VhyQ2owvcHqvfN9K8NQJlmTazpFPhfe6qfsWW4KAcZTY=
-  on:
-    tags: true
-    distributions: sdist bdist_wheel
-    repo: Noctem/aiopogo

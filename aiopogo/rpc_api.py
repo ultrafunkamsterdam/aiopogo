@@ -138,6 +138,9 @@ class RpcApi:
                 exception = ServerApiEndpointRedirectException()
                 exception.set_redirected_endpoint(api_url)
                 raise exception
+            elif status_code == 3:
+                req_type = self.get_request_name(subrequests)
+                raise BadRPCException("Bad Request on {}".format(req_type))
             else:
                 err = StatusCode(status_code).name
                 req_type = self.get_request_name(subrequests)

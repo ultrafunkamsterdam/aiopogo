@@ -6,20 +6,20 @@ except ImportError:
     class SocksError(Exception): pass
 
 
-class PgoapiError(Exception):
+class AiopogoError(Exception):
     """Any custom exception in this module"""
 
-class HashServerException(PgoapiError):
+class HashServerException(AiopogoError):
     """Parent class of all hashing server errors"""
 
 class ProxyException(ProxyConnectionError, SocksError):
     """Raised when there is an error connecting to a proxy server."""
 
-class TimeoutException(PgoapiError, TimeoutError):
+class TimeoutException(AiopogoError, TimeoutError):
     """Raised when a request times out."""
 
 
-class AuthException(PgoapiError):
+class AuthException(AiopogoError):
     """Raised when logging in fails"""
 
 class ActivationRequiredException(AuthException):
@@ -32,11 +32,11 @@ class InvalidCredentialsException(AuthException, ValueError):
     """Raised when the username, password, or provider are empty/invalid"""
 
 
-class AuthTokenExpiredException(PgoapiError):
+class AuthTokenExpiredException(AiopogoError):
     """Raised when your auth token has expired (code 102)"""
 
 
-class BadRequestException(PgoapiError):
+class BadRequestException(AiopogoError):
     """Raised when HTTP code 400 is returned"""
 
 class BadHashRequestException(BadRequestException, HashServerException):
@@ -45,8 +45,11 @@ class BadHashRequestException(BadRequestException, HashServerException):
 class InvalidRPCException(BadRequestException):
     """Raised when an invalid RPC is made."""
 
+class BadRPCException(InvalidRPCException):
+    """Raised when an invalid RPC is made."""
 
-class BannedAccountException(PgoapiError):
+
+class BannedAccountException(AiopogoError):
     """Raised when an account is banned"""
 
 
@@ -54,25 +57,25 @@ class ExpiredHashKeyException(HashServerException):
     """Raised when a hash key has expired."""
 
 
-class MalformedResponseException(PgoapiError):
+class MalformedResponseException(AiopogoError):
     """Raised when the response is empty or not in an expected format"""
 
-class MalformedNianticResponseException(PgoapiError):
+class MalformedNianticResponseException(AiopogoError):
     """Raised when a Niantic response is empty or not in an expected format"""
 
 class MalformedHashResponseException(MalformedResponseException, HashServerException):
     """Raised when the response from the hash server cannot be parsed."""
 
 
-class NoPlayerPositionSetException(PgoapiError, ValueError):
+class NoPlayerPositionSetException(AiopogoError, ValueError):
     """Raised when either lat or lng is None"""
 
 
-class NotLoggedInException(PgoapiError):
+class NotLoggedInException(AiopogoError):
     """Raised when attempting to make a request while not authenticated"""
 
 
-class ServerBusyOrOfflineException(PgoapiError):
+class ServerBusyOrOfflineException(AiopogoError):
     """Raised when unable to establish a connection with a server"""
 
 class AuthConnectionException(AuthException, ServerBusyOrOfflineException):
@@ -91,11 +94,11 @@ class HashingTimeoutException(HashingOfflineException, TimeoutException):
     """Raised when a request to the hashing server times out."""
 
 
-class PleaseInstallProtobufVersion3(PgoapiError):
+class PleaseInstallProtobufVersion3(AiopogoError):
     """Raised when Protobuf is unavailable or too old"""
 
 
-class ServerSideAccessForbiddenException(PgoapiError):
+class ServerSideAccessForbiddenException(AiopogoError):
     """Raised when access to a server is forbidden"""
 
 class NianticIPBannedException(ServerSideAccessForbiddenException):
@@ -108,24 +111,21 @@ class TempHashingBanException(HashingForbiddenException):
     """Raised when your IP is temporarily banned for sending too many requests with invalid keys."""
 
 
-class ServerSideRequestThrottlingException(PgoapiError):
+class ServerSideRequestThrottlingException(AiopogoError):
     """Raised when too many requests were made in a short period"""
-
-class NianticThrottlingException(ServerSideRequestThrottlingException):
-    """Raised when too many requests to Niantic were made in a short period"""
 
 class HashingQuotaExceededException(ServerSideRequestThrottlingException, HashServerException):
     """Raised when you exceed your hashing server quota"""
 
 
-class UnexpectedResponseException(PgoapiError):
+class UnexpectedResponseException(AiopogoError):
     """Raised when an unhandled HTTP status code is received"""
 
 class UnexpectedHashResponseException(UnexpectedResponseException, HashServerException):
     """Raised when an unhandled HTTP code is received from the hash server"""
 
 
-class ServerApiEndpointRedirectException(PgoapiError):
+class ServerApiEndpointRedirectException(AiopogoError):
     """Raised when the API redirects you to another endpoint"""
     def __init__(self):
         self._api_endpoint = None
