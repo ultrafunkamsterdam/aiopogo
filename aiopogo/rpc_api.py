@@ -110,7 +110,7 @@ class RpcApi:
             return to_camel_case(RequestType.Name(num))
         except IndexError:
             return 'empty'
-        except Exception:
+        except (ValueError, TypeError):
             return 'unknown'
 
     async def request(self, endpoint, subrequests, player_position):
@@ -352,24 +352,24 @@ class RpcApi:
                                 self.log.debug("%s -> %s", key, i)
                                 r = getattr(subrequest_extension, key)
                                 r.append(i)
-                            except Exception as e:
+                            except (AttributeError, ValueError) as e:
                                 self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, i, proto_name, e)
                     elif isinstance(value, dict):
                         for k in value.keys():
                             try:
                                 r = getattr(subrequest_extension, key)
                                 setattr(r, k, value[k])
-                            except Exception as e:
+                            except (AttributeError, ValueError) as e:
                                 self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, str(value), proto_name, e)
                     else:
                         try:
                             setattr(subrequest_extension, key, value)
-                        except Exception as e:
+                        except (AttributeError, ValueError) as e:
                             try:
                                 self.log.debug("%s -> %s", key, value)
                                 r = getattr(subrequest_extension, key)
                                 r.append(value)
-                            except Exception as e:
+                            except (AttributeError, ValueError) as e:
                                 self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, value, proto_name, e)
 
                 subrequest = mainrequest.requests.add()
@@ -446,7 +446,7 @@ class RpcApi:
 
             try:
                 subresponse_extension = self.get_class(proto_classname)()
-            except Exception:
+            except (AttributeError, TypeError):
                 subresponse_extension = None
                 error = 'Protobuf definition for {} not found'.format(proto_classname)
                 subresponse_return = error
@@ -455,7 +455,7 @@ class RpcApi:
                 try:
                     subresponse_extension.ParseFromString(subresponse)
                     subresponse_return = protobuf_to_dict(subresponse_extension)
-                except Exception:
+                except (AttributeError, ValueError, TypeError):
                     error = "Protobuf definition for {} seems not to match".format(proto_classname)
                     subresponse_return = error
                     self.log.warning(error)

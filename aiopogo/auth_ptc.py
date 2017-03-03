@@ -1,5 +1,5 @@
 from urllib.parse import parse_qs, urlsplit
-from asyncio import get_event_loop, TimeoutError
+from asyncio import get_event_loop, TimeoutError, CancelledError
 
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
@@ -117,7 +117,7 @@ class AuthPtc(Auth):
         except (ClientError, DisconnectedError) as e:
             err = e.__cause__ or e
             raise AuthConnectionException('{} during user_login.'.format(err.__class__.__name__)) from e
-        except AuthException:
+        except (AuthException, CancelledError):
             raise
         except Exception as e:
             raise AuthException('{} during user_login.'.format(e.__class__.__name__)) from e
@@ -187,7 +187,7 @@ class AuthPtc(Auth):
                 raise ProxyException('Proxy connection error while fetching access token.') from e
             except (ClientError, DisconnectedError) as e:
                 raise AuthConnectionException('{} while fetching access token.'.format(e.__class__.__name__)) from e
-            except AuthException:
+            except (AuthException, CancelledError):
                 raise
             except Exception as e:
                 raise AuthException('{} while fetching access token.'.format(e.__class__.__name__)) from e

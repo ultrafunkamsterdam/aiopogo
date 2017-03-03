@@ -1,6 +1,6 @@
 from ctypes import c_int32, c_int64
 from base64 import b64encode
-from asyncio import get_event_loop, TimeoutError
+from asyncio import get_event_loop, TimeoutError, CancelledError
 
 from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
@@ -88,6 +88,8 @@ class HashServer:
             self.location_hash = c_int32(response['locationHash']).value
 
             self.request_hashes = tuple(c_int64(x).value for x in response['requestHashes'])
+        except CancelledError:
+            raise
         except Exception as e:
             raise MalformedHashResponseException('Unable to load values from hash response.') from e
 
