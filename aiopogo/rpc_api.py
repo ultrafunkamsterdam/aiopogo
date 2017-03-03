@@ -169,7 +169,7 @@ class RpcApi:
         request = RequestEnvelope()
         request.status_code = 2
 
-        request.request_id = self.state.id_gen.request_id()
+        request.request_id = self.state.request_id
 
         # 5: 43%, 10: 30%, 30: 5%, 50: 4%, 65: 10%, 200: 1%, float: 7%
         request.accuracy = rand.choose_weighted(
@@ -481,7 +481,10 @@ class RpcState:
         self.mag_z_max = self.mag_y_min + 15
         self._course = rand.uniform(0, 359.99)
         self.message8 = None
-        self.first_request = None
+
+    @property
+    def request_id(self):
+        return self.id_gen.request_id()
 
     @property
     def magnetic_field_x(self):

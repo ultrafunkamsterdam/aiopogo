@@ -91,6 +91,10 @@ class PGoApi:
     def get_hash_server_token(self):
         return self._hash_server_token
 
+    @property
+    def start_time(self):
+        return self._state.start_time
+
     async def __getattr__(self, func):
         async def function(**kwargs):
             request = self.create_request()
