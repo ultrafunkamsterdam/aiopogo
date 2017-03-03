@@ -1,5 +1,3 @@
-import json
-
 from ctypes import c_int32, c_int64
 from base64 import b64encode
 from asyncio import get_event_loop, TimeoutError
@@ -7,8 +5,19 @@ from asyncio import get_event_loop, TimeoutError
 from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
-from .utilities import JSONByteEncoder
 from .connector import TimedConnector
+
+try:
+    import ujson as json
+
+    jargs = {'escape_forward_slashes': False}
+    jexc = ValueError
+except ImportError:
+    import json
+    from .utilities import JSONByteEncoder
+
+    jargs = {'cls': JSONByteEncoder}
+    jexc = (json.JSONDecodeError, ValueError)
 
 
 class HashServer:
@@ -21,7 +30,7 @@ class HashServer:
         self.auth_token = auth_token
         self.activate_session()
 
-    async def hash(self, timestamp, latitude, longitude, altitude, authticket, sessiondata, requests):
+    async def hash(self, timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests):
         self.location_hash = None
         self.location_auth_hash = None
         headers = {'X-AuthToken': self.auth_token}
@@ -30,12 +39,12 @@ class HashServer:
             'Timestamp': timestamp,
             'Latitude': latitude,
             'Longitude': longitude,
-            'Altitude': altitude,
+            'Altitude': accuracy,
             'AuthTicket': b64encode(authticket),
             'SessionData': b64encode(sessiondata),
             'Requests': tuple(b64encode(x.SerializeToString()) for x in requests)
         }
-        payload = json.dumps(payload, cls=JSONByteEncoder)
+        payload = json.dumps(payload, **jargs)
 
         # request hashes from hashing server
         try:
@@ -65,8 +74,8 @@ class HashServer:
                     pass
 
                 try:
-                    response = await resp.json()
-                except (json.JSONDecodeError, ValueError) as e:
+                    response = await resp.json(encoding='ascii', loads=json.loads)
+                except jexc as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
         except (TimeoutException, TimeoutError) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e

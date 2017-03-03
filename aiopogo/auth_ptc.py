@@ -1,5 +1,4 @@
 from urllib.parse import parse_qs, urlsplit
-from json import JSONDecodeError
 from asyncio import get_event_loop, TimeoutError
 
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
@@ -9,6 +8,14 @@ from .auth import Auth
 from .utilities import get_time
 from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, TimeoutException
 
+try:
+    import ujson as json
+
+    jexc = ValueError
+except ImportError:
+    import json
+
+    jexc = jexc = (json.JSONDecodeError, ValueError)
 
 class AuthPtc(Auth):
 
@@ -64,7 +71,7 @@ class AuthPtc(Auth):
             now = get_time()
             async with self._session.get(self.PTC_LOGIN_URL, timeout=self.timeout, proxy=self.proxy) as resp:
                 resp.raise_for_status()
-                data = await resp.json()
+                data = await resp.json(loads=json.loads)
 
             try:
                 data['_eventId'] = 'submit'
@@ -81,8 +88,8 @@ class AuthPtc(Auth):
                     self._access_token = resp.cookies['CASTGC'].value
                 except KeyError:
                     try:
-                        j = await resp.json()
-                    except JSONDecodeError as e:
+                        j = await resp.json(loads=json.loads)
+                    except jexc as e:
                         raise AuthException('Unable to decode second response.') from e
                     try:
                         if j.get('error_code') == 'users.login.activation_required':
@@ -105,7 +112,7 @@ class AuthPtc(Auth):
             raise AuthTimeoutException('user_login timeout.') from e
         except ProxyException as e:
             raise ProxyException('Proxy connection error during user_login.') from e
-        except JSONDecodeError as e:
+        except jexc as e:
             raise AuthException('Unable to parse user_login response.') from e
         except (ClientError, DisconnectedError) as e:
             err = e.__cause__ or e

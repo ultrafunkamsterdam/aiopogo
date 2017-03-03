@@ -16,6 +16,7 @@ setup(name='aiopogo',
           'aiohttp==1.3.*',
           'pycrypt>=0.1.1',
           'pogeo>=0.2.0'],
+      extras_require={'ujson': ['ujson']},
       package_data={'aiopogo': ['lib/*.so', 'lib/*.dylib', 'lib/*.dll']},
       classifiers=[
           'Development Status :: 5 - Production/Stable',
