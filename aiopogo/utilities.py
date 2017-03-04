@@ -12,14 +12,7 @@ from logging import getLogger
 from random import Random
 from bisect import bisect
 
-EARTH_RADIUS = 6371009  # radius of Earth in meters
-try:
-    import pogeo
-    HAVE_POGEO = True
-except ImportError:
-    HAVE_POGEO = False
-    from s2sphere import Angle, Cap, LatLng, RegionCoverer
-    DEFAULT_ANGLE = Angle.from_degrees(360 * 500 / (2 * pi * EARTH_RADIUS))
+import pogeo
 
 log = getLogger(__name__)
 
@@ -48,26 +41,11 @@ class JSONByteEncoder(JSONEncoder):
         return o.decode('ascii')
 
 
-if HAVE_POGEO:
-    def get_cell_ids(lat, lon, radius=500, compact=False):
-        if compact:
-            return array('Q', pogeo.get_cell_ids(lat, lon, radius))
-        else:
-            return pogeo.get_cell_ids(lat, lon, radius)
-else:
-    def get_cell_ids(lat, lon, radius=None, compact=False):
-        if radius:
-            angle = Angle.from_degrees(360 * radius / (2 * pi * EARTH_RADIUS))
-        else:
-            angle = DEFAULT_ANGLE
-        region = Cap.from_axis_angle(LatLng.from_degrees(lat, lon).to_point(), angle)
-        coverer = RegionCoverer()
-        coverer.min_level = 15
-        coverer.max_level = 15
-        covering = coverer.get_covering(region)
-        if compact:
-            return array('Q', (x.id() for x in covering))
-        return tuple(x.id() for x in covering)
+def get_cell_ids(lat, lon, radius=500, compact=False):
+    if compact:
+        return array('Q', pogeo.get_cell_ids(lat, lon, radius))
+    else:
+        return pogeo.get_cell_ids(lat, lon, radius)
 
 
 def get_time():
