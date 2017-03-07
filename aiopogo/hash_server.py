@@ -21,7 +21,7 @@ except ImportError:
 
 
 class HashServer:
-    endpoint = "https://pokehash.buddyauth.com/api/v127_3/hash"
+    endpoint = "https://pokehash.buddyauth.com/api/v127_4/hash"
     status = {}
     _session = None
     loop = get_event_loop()

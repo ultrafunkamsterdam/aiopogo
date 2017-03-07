@@ -2,6 +2,10 @@ from urllib.parse import parse_qs, urlsplit
 from asyncio import get_event_loop, TimeoutError, CancelledError
 
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
+try:
+    from aiosocks.errors import SocksError
+except ImportError:
+    class SocksError(Exception): pass
 
 from .session import socks_connector, CONN_TIMEOUT
 from .auth import Auth
@@ -110,7 +114,7 @@ class AuthPtc(Auth):
             raise AuthConnectionException('Error {} during user_login: {}'.format(e.code, e.message))
         except (TimeoutError, TimeoutException) as e:
             raise AuthTimeoutException('user_login timeout.') from e
-        except ProxyException as e:
+        except (ProxyException, SocksError) as e:
             raise ProxyException('Proxy connection error during user_login.') from e
         except jexc as e:
             raise AuthException('Unable to parse user_login response.') from e
@@ -183,7 +187,7 @@ class AuthPtc(Auth):
                 raise AuthConnectionException('Error {} while fetching access token: {}'.format(e.code, e.message))
             except (TimeoutError, TimeoutException) as e:
                 raise AuthTimeoutException('Access token request timed out.') from e
-            except ProxyException as e:
+            except (ProxyException, SocksError) as e:
                 raise ProxyException('Proxy connection error while fetching access token.') from e
             except (ClientError, DisconnectedError) as e:
                 raise AuthConnectionException('{} while fetching access token.'.format(e.__class__.__name__)) from e
