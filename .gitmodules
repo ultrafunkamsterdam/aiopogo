@@ -1,4 +1,0 @@
-[submodule "niahash"]
-	path = aiopogo/lib
-	url = https://github.com/pokelibs/pgoapi-libs.git
-	branch = hash-only

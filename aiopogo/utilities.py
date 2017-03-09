@@ -1,8 +1,5 @@
 import time
 import struct
-import os
-import sys
-import platform
 
 from json import JSONEncoder
 from binascii import unhexlify
@@ -119,45 +116,3 @@ class CustomRandom(Random):
             c = 1 - c
             low, high = high, low
         return int(low + (high - low) * (u * c) ** 0.5)
-
-
-def get_lib_path():
-    # win32 doesn't necessarily mean 32 bits
-    arch = platform.architecture()[0]
-    plat = sys.platform
-    if plat in ('win32', 'cygwin'):
-        if arch == '64bit':
-            hash_lib = "libniahash-windows-x86-64.dll"
-        else:
-            hash_lib = "libniahash-windows-i686.dll"
-    elif plat == "darwin":
-        if arch == '64bit':
-            hash_lib = "libniahash-macos-x86-64.dylib"
-        else:
-            hash_lib = "libniahash-macos-i386.dylib"
-    elif os.uname()[4].startswith("arm") and arch == '32bit':
-        hash_lib = "libniahash-linux-arm32.so"
-    elif os.uname()[4].startswith("aarch64"):
-        hash_lib = "libniahash-linux-arm64.so"
-    elif plat.startswith('linux'):
-        if arch == '64bit':
-            hash_lib = "libniahash-linux-x86-64.so"
-        else:
-            hash_lib = "libniahash-linux-i386.so"
-    elif plat.startswith('freebsd'):
-        if arch == '64bit':
-            hash_lib = "libniahash-freebsd-x86-64.so"
-        else:
-            hash_lib = "libniahash-freebsd-i386.so"
-    else:
-        err = "Unexpected/unsupported platform: {}".format(plat)
-        log.error(err)
-        raise NotImplementedError(err)
-
-    hash_lib_path = os.path.join(os.path.dirname(__file__), "lib", hash_lib)
-    if not os.path.isfile(hash_lib_path):
-        err = "Could not find {} hashing library {}".format(plat, hash_lib_path)
-        log.error(err)
-        raise OSError(err)
-
-    return hash_lib_path

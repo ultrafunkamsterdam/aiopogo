@@ -5,7 +5,7 @@ from .rpc_api import RpcApi, RpcState
 from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
 from .utilities import parse_api_endpoint
-from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException
+from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoHashKeyException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException
 
 from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
 
@@ -81,8 +81,8 @@ class PGoApi:
 
     def create_request(self):
         request = PGoApiRequest(self, self._position_lat, self._position_lng,
-                                self._position_alt, self.device_info, self.proxy,
-                                self._hash_server_token)
+                                self._position_alt, self._hash_server_token,
+                                self.device_info, self.proxy)
         return request
 
     def activate_hash_server(self, hash_token):
@@ -108,8 +108,8 @@ class PGoApi:
 
 
 class PGoApiRequest:
-    def __init__(self, parent, lat, lng, alt, device_info=None, proxy=None,
-                 hash_token=None):
+    def __init__(self, parent, lat, lng, alt, hash_token, device_info=None,
+                 proxy=None):
         self.log = logging.getLogger(__name__)
 
         self.__parent__ = parent
@@ -127,6 +127,9 @@ class PGoApiRequest:
         self.hash_token = hash_token
 
     async def call(self):
+        if not self.hash_token:
+            raise NoHashKeyException('You must provide a hash key before making a request.')
+
         if self._position[0] is None or self._position[1] is None:
             raise NoPlayerPositionSetException('No position set.')
 
@@ -136,13 +139,7 @@ class PGoApiRequest:
         except AttributeError:
             raise NotLoggedInException('Not logged in.')
 
-        request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)
-
-        if self.hash_token:
-            request.set_api_version(0.57)
-            request.activate_hash_server(self.hash_token)
-        else:
-            request.activate_hash_library()
+        request = RpcApi(self._auth_provider, self.device_info, self._state, self.hash_token, proxy=self.proxy)
 
         response = None
         execute = True

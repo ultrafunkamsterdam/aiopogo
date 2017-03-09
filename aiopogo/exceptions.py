@@ -60,7 +60,11 @@ class MalformedNianticResponseException(AiopogoError):
     """Raised when a Niantic response is empty or not in an expected format"""
 
 class MalformedHashResponseException(MalformedResponseException, HashServerException):
-    """Raised when the response from the hash server cannot be parsed."""
+    """Raised when the response from the hash server cannot be parsed"""
+
+
+class NoHashKeyException(HashServerException):
+    """Raised when a request is made without a hash key being provided"""
 
 
 class NoPlayerPositionSetException(AiopogoError, ValueError):

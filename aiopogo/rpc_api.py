@@ -16,8 +16,7 @@ except ImportError:
     class SocksError(Exception): pass
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time_ms, get_lib_path, IdGenerator, CustomRandom
-from .hash_library import HashLibrary
+from .utilities import to_camel_case, get_time_ms, IdGenerator, CustomRandom
 from .hash_server import HashServer
 from .session import SessionManager
 
@@ -36,16 +35,13 @@ rand = CustomRandom()
 
 
 class RpcApi:
-    hash_lib_path = None
     log = getLogger(__name__)
 
-    def __init__(self, auth_provider, device_info, state, proxy=None):
+    def __init__(self, auth_provider, device_info, state, hash_token, proxy=None):
         self._auth_provider = auth_provider
         self.state = state
 
-        self._hash_engine = None
-        self._api_version = 0.45
-        self._encrypt_version = 2
+        self._hash_engine = HashServer(hash_token)
         if proxy and proxy.startswith('socks'):
             self._session = RPC_SESSIONS.get(proxy)
             self.proxy = None
@@ -55,21 +51,6 @@ class RpcApi:
 
         self.token2 = None
         self.device_info = device_info
-
-    def activate_hash_library(self):
-        if not self.hash_lib_path:
-            RpcApi.hash_lib_path = get_lib_path()
-        self._hash_server = False
-        self._hash_engine = HashLibrary(self.hash_lib_path)
-
-    def activate_hash_server(self, auth_token):
-        self._hash_server = True
-        self._hash_engine = HashServer(auth_token)
-
-    def set_api_version(self, api_version):
-        self._api_version = api_version
-        if api_version > 0.45:
-            self._encrypt_version = 3
 
     def get_class(self, cls):
         module_, class_ = cls.rsplit('.', 1)
@@ -214,9 +195,8 @@ class RpcApi:
             self.state.start_time = sig.epoch_timestamp_ms - rand.randint(6000, 10000)
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
 
-        if self._hash_server:
-            loop = HashServer.loop
-            hashing = loop.create_task(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
+        loop = HashServer.loop
+        hashing = loop.create_task(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
 
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
@@ -313,10 +293,7 @@ class RpcApi:
                 plat.type = 8
                 plat.request_message = plat8.SerializeToString()
 
-        if self._hash_server:
-            await hashing
-        else:
-            self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests)
+        await hashing
 
         sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
         sig.location_hash = self._hash_engine.location_hash
@@ -325,7 +302,7 @@ class RpcApi:
 
         signature_proto = sig.SerializeToString()
         sig_request = SendEncryptedSignatureRequest()
-        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start, self._encrypt_version)
+        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start, 3)
         plat = request.platform_requests.add()
         plat.type = 6
         plat.request_message = sig_request.SerializeToString()
