@@ -5,7 +5,8 @@ from .rpc_api import RpcApi, RpcState
 from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
 from .utilities import parse_api_endpoint
-from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoHashKeyException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException
+from .hash_server import HashServer
+from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, NotLoggedInException, ServerApiEndpointRedirectException
 
 from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('aiohttp.client').setLevel(40)
 
 class PGoApi:
-    def __init__(self, provider=None, lat=None, lng=None, alt=None, proxy=None, device_info=None, hash_token=None):
+    def __init__(self, provider=None, lat=None, lng=None, alt=None, proxy=None, device_info=None):
         self.set_logger()
         self.log.info('%s v%s', __title__, __version__)
 
@@ -26,7 +27,6 @@ class PGoApi:
         self._position_lng = lng
         self._position_alt = alt
 
-        self._hash_server_token = hash_token
         self.proxy = proxy
         self.device_info = device_info
 
@@ -81,15 +81,13 @@ class PGoApi:
 
     def create_request(self):
         request = PGoApiRequest(self, self._position_lat, self._position_lng,
-                                self._position_alt, self._hash_server_token,
-                                self.device_info, self.proxy)
+                                self._position_alt, self.device_info,
+                                self.proxy)
         return request
 
-    def activate_hash_server(self, hash_token):
-        self._hash_server_token = hash_token
-
-    def get_hash_server_token(self):
-        return self._hash_server_token
+    def activate_hash_server(self, hash_token, conn_limit=300):
+        HashServer.set_token(hash_token)
+        HashServer.activate_session()
 
     @property
     def start_time(self):
@@ -108,8 +106,7 @@ class PGoApi:
 
 
 class PGoApiRequest:
-    def __init__(self, parent, lat, lng, alt, hash_token, device_info=None,
-                 proxy=None):
+    def __init__(self, parent, lat, lng, alt, device_info=None, proxy=None):
         self.log = logging.getLogger(__name__)
 
         self.__parent__ = parent
@@ -124,12 +121,8 @@ class PGoApiRequest:
         self._req_method_list = []
         self.device_info = device_info
         self.proxy = proxy
-        self.hash_token = hash_token
 
     async def call(self):
-        if not self.hash_token:
-            raise NoHashKeyException('You must provide a hash key before making a request.')
-
         if self._position[0] is None or self._position[1] is None:
             raise NoPlayerPositionSetException('No position set.')
 
@@ -139,7 +132,7 @@ class PGoApiRequest:
         except AttributeError:
             raise NotLoggedInException('Not logged in.')
 
-        request = RpcApi(self._auth_provider, self.device_info, self._state, self.hash_token, proxy=self.proxy)
+        request = RpcApi(self._auth_provider, self.device_info, self._state, proxy=self.proxy)
 
         response = None
         execute = True

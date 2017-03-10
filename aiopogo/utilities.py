@@ -104,7 +104,6 @@ class CustomRandom(Random):
         and having a given mode value in-between.
 
         http://en.wikipedia.org/wiki/Triangular_distribution
-
         """
         u = self.random()
         try:

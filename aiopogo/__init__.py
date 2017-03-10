@@ -3,10 +3,10 @@ from .exceptions import PleaseInstallProtobufVersion3
 import logging
 
 __title__ = 'aiopogo'
-__version__ = '1.2'
-__author__ = 'Noctem'
+__version__ = '1.5.0'
+__author__ = 'David Christenson'
 __license__ = 'MIT License'
-__copyright__ = 'Copyright (c) 2017 Noctem <https://github.com/Noctem>'
+__copyright__ = 'Copyright (c) 2017 David Christenson <https://github.com/Noctem>'
 
 protobuf_exist = False
 protobuf_version = 0
@@ -29,9 +29,6 @@ def close_sessions():
     RPC_SESSIONS.close()
     HashServer.close_session()
 
-logging.getLogger("pgoapi").addHandler(logging.NullHandler())
-logging.getLogger("rpc_api").addHandler(logging.NullHandler())
-logging.getLogger("utilities").addHandler(logging.NullHandler())
-logging.getLogger("auth").addHandler(logging.NullHandler())
-logging.getLogger("auth_ptc").addHandler(logging.NullHandler())
-logging.getLogger("auth_google").addHandler(logging.NullHandler())
+def activate_hash_server(hash_token, conn_limit=300):
+    HashServer.set_token(hash_token)
+    HashServer.activate_session(conn_limit)

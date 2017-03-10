@@ -37,11 +37,11 @@ rand = CustomRandom()
 class RpcApi:
     log = getLogger(__name__)
 
-    def __init__(self, auth_provider, device_info, state, hash_token, proxy=None):
+    def __init__(self, auth_provider, device_info, state, proxy=None):
         self._auth_provider = auth_provider
         self.state = state
 
-        self._hash_engine = HashServer(hash_token)
+        self._hash_engine = HashServer()
         if proxy and proxy.startswith('socks'):
             self._session = RPC_SESSIONS.get(proxy)
             self.proxy = None
