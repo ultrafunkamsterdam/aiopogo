@@ -4,6 +4,7 @@ from asyncio import get_event_loop, TimeoutError, CancelledError, sleep
 from itertools import cycle
 from time import time
 from logging import getLogger
+from struct import pack, unpack
 
 from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
@@ -13,7 +14,7 @@ from .connector import TimedConnector
 try:
     import ujson as json
 
-    jargs = {'double_precision': 17, 'escape_forward_slashes': False}
+    jargs = {'escape_forward_slashes': False}
     jexc = ValueError
 except ImportError:
     import json
@@ -24,7 +25,7 @@ except ImportError:
 
 
 class HashServer:
-    endpoint = "https://pokehash.buddyauth.com/api/v127_4/hash"
+    endpoint = "http://pokehash.buddyauth.com/api/v127_4/hash"
     _session = None
     multi = False
     loop = get_event_loop()
@@ -55,9 +56,9 @@ class HashServer:
 
         payload = {
             'Timestamp': timestamp,
-            'Latitude': latitude,
-            'Longitude': longitude,
-            'Altitude': accuracy,
+            'Latitude64': unpack('<q', pack('<d', latitude))[0],
+            'Longitude64': unpack('<q', pack('<d', longitude))[0],
+            'Accuracy64': unpack('<q', pack('<d', accuracy))[0],
             'AuthTicket': b64encode(authticket),
             'SessionData': b64encode(sessiondata),
             'Requests': tuple(b64encode(x.SerializeToString()) for x in requests)
