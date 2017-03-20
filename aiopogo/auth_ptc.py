@@ -1,5 +1,6 @@
 from urllib.parse import parse_qs, urlsplit
 from asyncio import get_event_loop, TimeoutError, CancelledError
+from time import time
 
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 try:
@@ -9,7 +10,6 @@ except ImportError:
 
 from .session import socks_connector, CONN_TIMEOUT
 from .auth import Auth
-from .utilities import get_time
 from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, TimeoutException
 
 try:
@@ -72,7 +72,7 @@ class AuthPtc(Auth):
         self._access_token = None
         self.activate_session()
         try:
-            now = get_time()
+            now = time()
             async with self._session.get(self.PTC_LOGIN_URL, timeout=self.timeout, proxy=self.proxy) as resp:
                 resp.raise_for_status()
                 data = await resp.json(loads=json.loads)
@@ -105,7 +105,7 @@ class AuthPtc(Auth):
 
             if self._access_token:
                 self._login = True
-                self._access_token_expiry = now + 7200
+                self._access_token_expiry = now + 7200.0
                 self.log.info('PTC User Login successful.')
             elif self._refresh_token and retry:
                 return await self.get_access_token()
@@ -172,7 +172,7 @@ class AuthPtc(Auth):
                     # three hours, however, the token stops being valid after two hours.
                     # See issue #86
                     try:
-                        self._access_token_expiry = token_data['expires'][0] - 3600 + get_time()
+                        self._access_token_expiry = token_data['expires'][0] - 3600 + time()
                     except (KeyError, IndexError, TypeError):
                         self._access_token_expiry = 0
 

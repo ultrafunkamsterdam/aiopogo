@@ -1,17 +1,18 @@
-import logging
+from logging import getLogger
+from time import time
 
-from .utilities import get_time, get_time_ms, get_format_time_diff
+from .utilities import get_time_ms, get_format_time_diff
 
 class Auth:
 
     def __init__(self):
-        self.log = logging.getLogger(__name__)
+        self.log = getLogger(__name__)
 
         self._auth_provider = None
 
         self._login = False
 
-        # oauth2 uses refresh tokens (which basically never expires)
+        # oauth2 uses refresh tokens (which basically never expire)
         # to get an access_token which is only valid for a certain time)
         self._refresh_token = None
         self._access_token = None
@@ -75,11 +76,9 @@ class Auth:
         raise NotImplementedError()
 
     def check_access_token(self):
-        """
-        Add few seconds to now so the token get refreshed 
-        before it invalidates in the middle of the request
-        """
-        now_s = get_time() + 120
+        # Add a couple minutes so the token gets refreshed
+        # before invalidating in the middle of the request
+        now_s = time() + 120.0
 
         if self._access_token is not None:
             if self._access_token_expiry == 0:

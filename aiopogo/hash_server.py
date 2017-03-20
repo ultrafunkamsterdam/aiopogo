@@ -10,6 +10,7 @@ from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessin
 
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .connector import TimedConnector
+from .utilities import f2i
 
 try:
     import ujson as json
@@ -56,9 +57,9 @@ class HashServer:
 
         payload = {
             'Timestamp': timestamp,
-            'Latitude64': unpack('<q', pack('<d', latitude))[0],
-            'Longitude64': unpack('<q', pack('<d', longitude))[0],
-            'Accuracy64': unpack('<q', pack('<d', accuracy))[0],
+            'Latitude64': f2i(latitude),
+            'Longitude64': f2i(longitude),
+            'Accuracy64': f2i(accuracy),
             'AuthTicket': b64encode(authticket),
             'SessionData': b64encode(sessiondata),
             'Requests': tuple(b64encode(x.SerializeToString()) for x in requests)

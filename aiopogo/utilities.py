@@ -1,31 +1,18 @@
-import time
-import struct
-
+from time import time
 from json import JSONEncoder
-from binascii import unhexlify
-from math import pi
 from array import array
 from logging import getLogger
 from random import Random
 from bisect import bisect
+from struct import pack, unpack
 
-import pogeo
+from pogeo import get_cell_ids
 
 log = getLogger(__name__)
 
 
-def f2i(float):
-    return struct.unpack('<Q', struct.pack('<d', float))[0]
-
-
-def f2h(float):
-    return hex(struct.unpack('<Q', struct.pack('<d', float))[0])
-
-
-def d2h(f):
-    hex_str = f2h(f)[2:].replace('L','')
-    hex_str = ("0" * (len(hex_str) % 2)) + hex_str
-    return unhexlify(hex_str)
+def f2i(f):
+    return unpack('<q', pack('<d', f))[0]
 
 
 def to_camel_case(value):
@@ -38,19 +25,12 @@ class JSONByteEncoder(JSONEncoder):
         return o.decode('ascii')
 
 
-def get_cell_ids(lat, lon, radius=500, compact=False):
-    if compact:
-        return array('Q', pogeo.get_cell_ids(lat, lon, radius))
-    else:
-        return pogeo.get_cell_ids(lat, lon, radius)
-
-
-def get_time():
-    return int(time.time())
+def get_cell_ids_compact(lat, lon, radius=500):
+    return array('Q', get_cell_ids(lat, lon, radius))
 
 
 def get_time_ms():
-    return int(time.time() * 1000)
+    return int(time() * 1000)
 
 
 def get_format_time_diff(low, high, ms=True):
