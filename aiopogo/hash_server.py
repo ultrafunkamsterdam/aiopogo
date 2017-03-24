@@ -6,16 +6,15 @@ from time import time
 from logging import getLogger
 from struct import pack, unpack
 
-from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
+from aiohttp import ClientSession, ClientError, ClientResponseError, ServerTimeoutError
 
 from . import json_dumps, json_loads
-from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
+from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .connector import TimedConnector
 from .utilities import f2i
 
 
 class HashServer:
-    endpoint = "http://pokehash.buddyauth.com/api/v131_0/hash"
     _session = None
     multi = False
     loop = get_event_loop()
@@ -54,43 +53,38 @@ class HashServer:
             'SessionData': b64encode(sessiondata),
             'Requests': [b64encode(x.SerializeToString()) for x in requests]
         }
-        payload = json_dumps(payload)
 
         # request hashes from hashing server
         try:
-            async with self._session.post(self.endpoint, headers=headers, data=payload) as resp:
-                try:
-                    resp.raise_for_status()
-                except HttpProcessingError as e:
-                    if e.code == 400:
-                        if self.multi:
-                            self.log.warning('{} expired, removing from rotation.'.format(self.instance_token))
-                            self.remove_token(self.instance_token)
-                            self.instance_token = self.auth_token
-                            return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
-                        text = await resp.text()
-                        raise ExpiredHashKeyException("Hash key appears to have expired. {}".format(text))
-                    elif e.code == 403:
-                        raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
-                    elif e.code == 429:
-                        status['remaining'] = 0
-                        raise HashingQuotaExceededException("429: hashing quota exceeded.")
-                    elif e.code >= 500:
-                        raise HashingOfflineException('Hashing server error {}: {}'.format(e.code, e.message))
-                    else:
-                        raise UnexpectedHashResponseException('Unexpected hash code {}: {}'.format(e.code, e.message))
-
-                headers = resp.headers
-
+            async with self._session.post("http://pokehash.buddyauth.com/api/v131_0/hash", headers=headers, json=payload) as resp:
                 try:
                     response = await resp.json(encoding='ascii', loads=json_loads)
                 except ValueError as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
-        except (TimeoutException, TimeoutError) as e:
+                headers = resp.headers
+        except ClientResponseError as e:
+            if e.code == 400:
+                if self.multi:
+                    self.log.warning('{} expired, removing from rotation.'.format(self.instance_token))
+                    self.remove_token(self.instance_token)
+                    self.instance_token = self.auth_token
+                    return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+                text = await resp.text()
+                raise ExpiredHashKeyException("Hash key appears to have expired. {}".format(text))
+            elif e.code == 403:
+                raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
+            elif e.code == 429:
+                status['remaining'] = 0
+                self.instance_token = self.auth_token
+                return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+            elif e.code >= 500:
+                raise HashingOfflineException('Hashing server error {}: {}'.format(e.code, e.message))
+            else:
+                raise UnexpectedHashResponseException('Unexpected hash code {}: {}'.format(e.code, e.message))
+        except (TimeoutError, ServerTimeoutError) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e
-        except (ClientError, DisconnectedError) as e:
-            err = e.__cause__ or e
-            raise HashingOfflineException('{} during hashing. {}'.format(err.__class__.__name__, e)) from e
+        except ClientError as e:
+            raise HashingOfflineException('{} during hashing. {}'.format(e.__class__.__name__, e)) from e
 
         try:
             status['remaining'] = int(headers['X-RateRequestsRemaining'])
@@ -122,16 +116,18 @@ class HashServer:
     def activate_session(cls, conn_limit=300):
         if cls._session and not cls._session.closed:
             return
-        headers = {'content-type': 'application/json',
-                   'Accept': 'application/json',
-                   'User-Agent': 'Python aiopogo'}
+        headers = (('Content-Type', 'application/json'),
+                   ('Accept', 'application/json'),
+                   ('User-Agent', 'Python aiopogo'))
         conn = TimedConnector(loop=cls.loop,
                               limit=conn_limit,
-                              verify_ssl=False,
-                              conn_timeout=6.0)
+                              verify_ssl=False)
         cls._session = ClientSession(connector=conn,
                                      loop=cls.loop,
-                                     headers=headers)
+                                     headers=headers,
+                                     raise_for_status=True,
+                                     conn_timeout=6.0,
+                                     json_serialize=json_dumps)
 
     @classmethod
     def close_session(cls):

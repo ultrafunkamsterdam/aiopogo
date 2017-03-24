@@ -6,7 +6,7 @@ from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
 from .utilities import parse_api_endpoint
 from .hash_server import HashServer
-from .exceptions import AuthException, AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, ServerApiEndpointRedirectException
+from .exceptions import AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, ServerApiEndpointRedirectException
 from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
 
 
@@ -15,6 +15,7 @@ class PGoApi:
     log.info('%s v%s', __title__, __version__)
 
     def __init__(self, provider=None, lat=None, lon=None, alt=None, proxy=None, device_info=None):
+        self.auth_provider = None
         self.state = RpcState()
 
         self._api_endpoint = 'https://pgorelease.nianticlabs.com/plfe/rpc'
@@ -39,8 +40,7 @@ class PGoApi:
         await self.auth_provider.user_login(username, password)
 
     def set_position(self, lat, lon, alt=None):
-        self.log.debug('Set Position - Lat: %s Long: %s Alt: %s', lat, lon, alt)
-
+        self.log.debug('Set Position - Lat: %s Lon: %s Alt: %s', lat, lon, alt)
         self.latitude = lat
         self.longitude = lon
         self.altitude = alt

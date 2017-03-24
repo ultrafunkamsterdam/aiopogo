@@ -11,8 +11,6 @@ except ImportError:
             raise ImportError('Install aiosocks to use socks proxies.')
     Socks4Addr = Socks5Addr = Socks5Auth = SocksConnector
 
-CONN_TIMEOUT = 10
-
 
 def socks_connector(proxy, loop=None):
     loop = loop or get_event_loop()
@@ -46,15 +44,16 @@ class SessionManager:
             else:
                 conn = TCPConnector(limit=300,
                                     loop=self.loop,
-                                    verify_ssl=False,
-                                    conn_timeout=CONN_TIMEOUT)
+                                    verify_ssl=False)
 
             self.sessions[proxy] = ClientSession(connector=conn,
                                                  loop=self.loop,
                                                  headers=(
                                                      ('Content-Type', 'application/x-www-form-urlencoded'),
                                                      ('User-Agent', 'Niantic App'),
-                                                     ('Accept-Language', 'en-us')))
+                                                     ('Accept-Language', 'en-us')),
+                                                 raise_for_status=True,
+                                                 conn_timeout=10.0)
             return self.sessions[proxy]
 
     def close(self):

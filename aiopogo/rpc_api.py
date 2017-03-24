@@ -8,7 +8,7 @@ from enum import Enum
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientError, DisconnectedError, HttpProcessingError, ProxyConnectionError
+from aiohttp import ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
 from pycrypt import pycrypt
 from cyrandom import choose_weighted, randint, random, triangular, triangular_int, uniform
 
@@ -52,10 +52,10 @@ class RpcApi:
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
             async with session.post(endpoint, data=request_proto_serialized, proxy=proxy) as resp:
-                resp.raise_for_status()
-
                 return await resp.read()
-        except HttpProcessingError as e:
+        except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
+            raise ProxyException('Proxy connection error during RPC request.') from e
+        except ClientResponseError as e:
             if e.code == 400:
                 raise BadRequestException("400: Bad RPC request. {}".format(e.message))
             elif e.code == 403:
@@ -63,14 +63,11 @@ class RpcApi:
             elif e.code >= 500:
                 raise NianticOfflineException('{} Niantic server error: {}'.format(e.code, e.message))
             else:
-                raise UnexpectedResponseException('Unexpected RPC response: {}, '.format(e.code, e.message))
-        except (ProxyConnectionError, SocksError) as e:
-            raise ProxyException('Proxy connection error during RPC request.') from e
-        except (TimeoutException, TimeoutError) as e:
+                raise UnexpectedResponseException('Unexpected RPC response: {}, {}'.format(e.code, e.message))
+        except (TimeoutError, ServerTimeoutError) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
-        except (ClientError, DisconnectedError) as e:
-            err = e.__cause__ or e
-            raise NianticOfflineException('{} during RPC. {}'.format(err.__class__.__name__, e)) from e
+        except ClientError as e:
+            raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
 
     @staticmethod
     def get_request_name(subrequests):

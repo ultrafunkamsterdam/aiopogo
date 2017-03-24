@@ -56,6 +56,10 @@ class ExpiredHashKeyException(HashServerException):
 class InvalidCredentialsException(AiopogoError, ValueError):
     """Raised when the username, password, or provider are empty/invalid"""
 
+class InvalidCredentialsException(AiopogoError, ValueError):
+    """Raised when the username, password, or provider are empty/invalid"""
+
+
 class MalformedResponseException(AiopogoError):
     """Raised when the response is empty or not in an expected format"""
 

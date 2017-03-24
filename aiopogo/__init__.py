@@ -1,5 +1,5 @@
 __title__ = 'aiopogo'
-__version__ = '1.7.2'
+__version__ = '1.8.0'
 __author__ = 'David Christenson'
 __license__ = 'MIT License'
 __copyright__ = 'Copyright (c) 2017 David Christenson <https://github.com/Noctem>'
@@ -16,7 +16,6 @@ if int(protobuf_version[:1]) < 3:
     raise PleaseInstallProtobufVersion3('Protobuf 3 needed, you have {}'.format(protobuf_version))
 
 from functools import partial as _partial
-from logging import getLogger as _getLogger
 
 try:
     from ujson import dumps as _dumps, loads as json_loads
@@ -29,8 +28,6 @@ except ImportError:
 from .pgoapi import PGoApi
 from .rpc_api import RpcApi
 from .hash_server import HashServer
-
-_getLogger('aiohttp.client').setLevel(40)
 
 def close_sessions():
     RpcApi.sessions.close()
