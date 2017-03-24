@@ -1,6 +1,7 @@
-from aiohttp import ProxyConnectionError
-from asyncio import TimeoutError
-
+try:
+    from aiosocks.errors import SocksError
+except ImportError:
+    class SocksError(Exception): pass
 
 class AiopogoError(Exception):
     """Any custom exception in this module"""
@@ -8,10 +9,10 @@ class AiopogoError(Exception):
 class HashServerException(AiopogoError):
     """Parent class of all hashing server errors"""
 
-class ProxyException(ProxyConnectionError):
+class ProxyException(AiopogoError):
     """Raised when there is an error connecting to a proxy server."""
 
-class TimeoutException(AiopogoError, TimeoutError):
+class TimeoutException(AiopogoError):
     """Raised when a request times out."""
 
 
@@ -23,9 +24,6 @@ class ActivationRequiredException(AuthException):
 
 class AuthTimeoutException(AuthException, TimeoutException):
     """Raised when an auth request times out."""
-
-class InvalidCredentialsException(AuthException, ValueError):
-    """Raised when the username, password, or provider are empty/invalid"""
 
 
 class AuthTokenExpiredException(AiopogoError):
@@ -51,6 +49,10 @@ class BannedAccountException(AiopogoError):
 
 class ExpiredHashKeyException(HashServerException):
     """Raised when a hash key has expired."""
+
+
+class InvalidCredentialsException(AiopogoError, ValueError):
+    """Raised when the username, password, or provider are empty/invalid"""
 
 
 class MalformedResponseException(AiopogoError):

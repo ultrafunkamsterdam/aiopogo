@@ -8,12 +8,8 @@ from enum import Enum
 
 from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
-from aiohttp import ClientError, DisconnectedError, HttpProcessingError
+from aiohttp import ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
 from pycrypt import pycrypt
-try:
-    from aiosocks.errors import SocksError
-except ImportError:
-    class SocksError(Exception): pass
 
 from .exceptions import *
 from .utilities import to_camel_case, get_time_ms, IdGenerator, CustomRandom
@@ -30,43 +26,38 @@ from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
 
 
-RPC_SESSIONS = SessionManager()
 rand = CustomRandom()
 
 
 class RpcApi:
     log = getLogger(__name__)
+    sessions = SessionManager()
 
-    def __init__(self, auth_provider, device_info, state, proxy=None):
+    def __init__(self, auth_provider, state):
         self._auth_provider = auth_provider
         self.state = state
-
-        self._hash_engine = HashServer()
-        if proxy and proxy.startswith('socks'):
-            self._session = RPC_SESSIONS.get(proxy)
-            self.proxy = None
-        else:
-            self._session = RPC_SESSIONS.get()
-            self.proxy = proxy
-
-        self.token2 = None
-        self.device_info = device_info
 
     def get_class(self, cls):
         module_, class_ = cls.rsplit('.', 1)
         class_ = getattr(import_module(module_), to_camel_case(class_))
         return class_
 
-    async def _make_rpc(self, endpoint, request_proto_plain):
+    async def _make_rpc(self, endpoint, request_proto_plain, proxy):
         self.log.debug('Execution of RPC')
+
+        if proxy and proxy.startswith('socks'):
+            session = self.sessions.get(proxy)
+            proxy = None
+        else:
+            session = self.sessions.get()
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with self._session.post(endpoint, data=request_proto_serialized, proxy=self.proxy) as resp:
-                resp.raise_for_status()
-
-                content = await resp.read()
-        except HttpProcessingError as e:
+            async with session.post(endpoint, data=request_proto_serialized, proxy=proxy) as resp:
+                return await resp.read()
+        except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
+            raise ProxyException('Proxy connection error during RPC request.') from e
+        except ClientResponseError as e:
             if e.code == 400:
                 raise BadRequestException("400: Bad RPC request. {}".format(e.message))
             elif e.code == 403:
@@ -74,22 +65,18 @@ class RpcApi:
             elif e.code >= 500:
                 raise NianticOfflineException('{} Niantic server error: {}'.format(e.code, e.message))
             else:
-                raise UnexpectedResponseException('Unexpected RPC response: {}, '.format(e.code, e.message))
-        except (ProxyException, SocksError) as e:
-            raise ProxyException('Proxy connection error during RPC request.') from e
-        except (TimeoutException, TimeoutError) as e:
+                raise UnexpectedResponseException('Unexpected RPC response: {}, {}'.format(e.code, e.message))
+        except (TimeoutError, ServerTimeoutError) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
-        except (ClientError, DisconnectedError) as e:
-            err = e.__cause__ or e
-            raise NianticOfflineException('{} during RPC. {}'.format(err.__class__.__name__, e)) from e
-        return content
+        except ClientError as e:
+            raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
 
     @staticmethod
     def get_request_name(subrequests):
         try:
             first = subrequests[0]
             if isinstance(first, dict):
-                num = tuple(first.keys())[0]
+                num = next(iter(first.keys()))
             else:
                 num = first
             return to_camel_case(RequestType.Name(num))
@@ -98,14 +85,10 @@ class RpcApi:
         except (ValueError, TypeError):
             return 'unknown'
 
-    async def request(self, endpoint, subrequests, player_position):
+    async def request(self, endpoint, subrequests, player_position, device_info=None, proxy=None):
+        request_proto = await self._build_main_request(subrequests, player_position, device_info)
 
-        if not self._auth_provider or self._auth_provider.is_login() is False:
-            raise NotLoggedInException
-
-        request_proto = await self._build_main_request(subrequests, player_position)
-
-        response = await self._make_rpc(endpoint, request_proto)
+        response = await self._make_rpc(endpoint, request_proto, proxy)
         response_dict = self._parse_main_response(response, subrequests)
 
         self.check_authentication(response_dict)
@@ -115,8 +98,7 @@ class RpcApi:
             status_code = response_dict['status_code']
             if status_code in (1, 2):
                 return response_dict
-
-            if status_code == 102:
+            elif status_code == 102:
                 raise AuthTokenExpiredException
             elif status_code == 53:
                 api_url = response_dict['api_url']
@@ -148,7 +130,7 @@ class RpcApi:
         except (TypeError, KeyError):
             return
 
-    async def _build_main_request(self, subrequests, player_position=None):
+    async def _build_main_request(self, subrequests, player_position, device_info=None):
         self.log.debug('Generating main RPC request...')
 
         request = RequestEnvelope()
@@ -163,8 +145,7 @@ class RpcApi:
         if request.accuracy == -1:
             request.accuracy = rand.uniform(65, 200)
 
-        if player_position:
-            request.latitude, request.longitude, altitude = player_position
+        request.latitude, request.longitude, altitude = player_position
 
         # generate sub requests before SignalLog generation
         request = self._build_sub_requests(request, subrequests)
@@ -179,12 +160,10 @@ class RpcApi:
             request.auth_info.provider = self._auth_provider.get_name()
             request.auth_info.token.contents = await self._auth_provider.get_access_token()
 
-            if not self.token2:
-                # 59: 50%, others: 5% each
-                self.token2 = rand.choose_weighted(
+            # 59: 50%, others: 5% each
+            request.auth_info.token.unknown2 = rand.choose_weighted(
                     (4, 19, 22, 26, 30, 44, 45, 50, 57, 58, 59),
                     (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20))
-            request.auth_info.token.unknown2 = self.token2
             ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
 
         sig = SignalLog()
@@ -195,8 +174,8 @@ class RpcApi:
             self.state.start_time = sig.epoch_timestamp_ms - rand.randint(6000, 10000)
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
 
-        loop = HashServer.loop
-        hashing = loop.create_task(self._hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
+        hash_engine = HashServer()
+        hashing = HashServer.loop.create_task(hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
 
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
@@ -268,9 +247,9 @@ class RpcApi:
         sig.version_hash = -816976800928766045
 
         try:
-            for key in self.device_info:
-                setattr(sig.device_info, key, self.device_info[key])
-        except TypeError:
+            for key, value in device_info.items():
+                setattr(sig.device_info, key, value)
+        except AttributeError:
             pass
         sig.ios_device_info.bool5 = True
 
@@ -293,11 +272,9 @@ class RpcApi:
                 plat.type = 8
                 plat.request_message = plat8.SerializeToString()
 
-        await hashing
+        sig.location_hash, sig.location_hash_by_token_seed, rh = await hashing
 
-        sig.location_hash_by_token_seed = self._hash_engine.location_auth_hash
-        sig.location_hash = self._hash_engine.location_hash
-        for req_hash in self._hash_engine.request_hashes:
+        for req_hash in rh:
             sig.request_hashes.append(req_hash)
 
         signature_proto = sig.SerializeToString()
@@ -317,7 +294,7 @@ class RpcApi:
 
         for entry in subrequest_list:
             if isinstance(entry, dict):
-                entry_id = tuple(entry.items())[0][0]
+                entry_id = next(iter(entry.keys()))
                 entry_content = entry[entry_id]
 
                 entry_name = RequestType.Name(entry_id)
@@ -420,7 +397,7 @@ class RpcApi:
             if isinstance(request_entry, int):
                 entry_id = request_entry
             else:
-                entry_id = tuple(request_entry.items())[0][0]
+                entry_id = next(iter(request_entry.keys()))
 
             entry_name = RequestType.Name(entry_id)
             proto_name = entry_name.lower() + '_response'

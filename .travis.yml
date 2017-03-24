@@ -6,4 +6,4 @@ install:
 - pip install -r requirements.txt
 - python setup.py install
 script:
-- python -c 'import aiopogo'
+- python -c 'from aiopogo import auth_google, auth_ptc, auth, connector, exceptions, hash_server, pgoapi, rpc_api, session, utilities'
