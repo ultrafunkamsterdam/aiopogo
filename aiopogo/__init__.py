@@ -1,7 +1,7 @@
 from .exceptions import PleaseInstallProtobufVersion3
 
 __title__ = 'aiopogo'
-__version__ = '1.6.0b1'
+__version__ = '1.6.0b2'
 __author__ = 'David Christenson'
 __license__ = 'MIT License'
 __copyright__ = 'Copyright (c) 2017 David Christenson <https://github.com/Noctem>'

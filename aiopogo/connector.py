@@ -117,4 +117,4 @@ class TimedConnector(TCPConnector):
 
             if self._cleanup_handle is None:
                 self._cleanup_handle = helpers.weakref_handle(
-                    self._cleanup, self._keepalive_timeout, self._loop)
+                    self, '_cleanup', self._keepalive_timeout, self._loop)
