@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages
-from aiopogo import __title__, __version__, __author__
 
-setup(name=__title__,
-      author=__author__,
+setup(name='aiopogo',
+      author='David Christenson',
       author_email='mail@noctem.xyz',
       description='Asynchronous Pokemon API lib',
-      version=__version__,
+      version='1.6.0',
       url='https://github.com/Noctem/aiopogo',
       packages=find_packages(),
       install_requires=[
@@ -15,7 +14,7 @@ setup(name=__title__,
           'gpsoauth>=0.4.0',
           'protobuf3-to-dict>=0.1.4',
           'aiohttp==1.3.*',
-          'pycrypt>=0.1.1',
+          'pycrypt>=0.2.0',
           'pogeo>=0.2.0'],
       extras_require={'ujson': ['ujson']},
       classifiers=[
