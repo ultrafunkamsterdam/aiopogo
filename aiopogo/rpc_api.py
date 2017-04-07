@@ -244,7 +244,7 @@ class RpcApi:
         sen.gravity_z = rand.triangular(-1, 1, -.4)
         sen.status = 3
 
-        sig.version_hash = -816976800928766045
+        sig.version_hash = -3226782243204485589
 
         try:
             for key, value in device_info.items():
@@ -279,7 +279,7 @@ class RpcApi:
 
         signature_proto = sig.SerializeToString()
         sig_request = SendEncryptedSignatureRequest()
-        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start, 3)
+        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start)
         plat = request.platform_requests.add()
         plat.type = 6
         plat.request_message = sig_request.SerializeToString()

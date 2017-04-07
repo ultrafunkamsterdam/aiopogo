@@ -56,7 +56,7 @@ class HashServer:
 
         # request hashes from hashing server
         try:
-            async with self._session.post("http://pokehash.buddyauth.com/api/v127_4/hash", headers=headers, json=payload) as resp:
+            async with self._session.post("http://pokehash.buddyauth.com/api/v129_1/hash", headers=headers, json=payload) as resp:
                 try:
                     response = await resp.json(encoding='ascii', loads=json_loads)
                 except ValueError as e:
