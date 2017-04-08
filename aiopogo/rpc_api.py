@@ -265,7 +265,7 @@ class RpcApi:
         sen.gravity_z = rand.triangular(-1, 1, -.4)
         sen.status = 3
 
-        sig.version_hash = -3226782243204485589
+        sig.version_hash = 1296456256998993698
 
         try:
             for key in self.device_info:
