@@ -1,8 +1,6 @@
-import asyncio
+from asyncio import wait_for, TimeoutError
 
-from aiohttp import helpers
-from aiohttp.connector import Connection, TCPConnector
-from aiohttp.errors import ClientOSError, ClientTimeoutError
+from aiohttp.connector import Connection, TCPConnector, ClientOSError, ClientTimeoutError
 
 
 class TimedConnection(Connection):
@@ -27,7 +25,7 @@ class TimedConnector(TCPConnector):
 
         limit = self._limit
         if limit is not None:
-            fut = helpers.create_future(self._loop)
+            fut = self._loop.create_future()
             waiters = self._waiters[key]
 
             # The limit defines the maximum number of concurrent connections
@@ -50,14 +48,14 @@ class TimedConnector(TCPConnector):
             if transport is None:
                 try:
                     if self._conn_timeout:
-                        transport, proto = await asyncio.wait_for(
+                        transport, proto = await wait_for(
                             self._create_connection(req),
                             self._conn_timeout, loop=self._loop)
                     else:
                         transport, proto = \
                             await self._create_connection(req)
 
-                except asyncio.TimeoutError as exc:
+                except TimeoutError as exc:
                     raise ClientTimeoutError(
                         'Connection timeout to host {0[0]}:{0[1]} ssl:{0[2]}'
                         .format(key)) from exc

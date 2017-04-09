@@ -8,21 +8,10 @@ from struct import pack, unpack
 
 from aiohttp import ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
+from . import json_dumps, json_loads
 from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingQuotaExceededException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .connector import TimedConnector
 from .utilities import f2i
-
-try:
-    import ujson as json
-
-    jargs = {'escape_forward_slashes': False}
-    jexc = ValueError
-except ImportError:
-    import json
-    from .utilities import JSONByteEncoder
-
-    jargs = {'cls': JSONByteEncoder}
-    jexc = (json.JSONDecodeError, ValueError)
 
 
 class HashServer:
@@ -51,6 +40,7 @@ class HashServer:
                 else:
                     self.log.info('Out of hashes, waiting for new period.')
                     await sleep(status['refresh'] - time() + 1, loop=self.loop)
+                    break
         except KeyError:
             pass
         headers = {'X-AuthToken': self.instance_token}
@@ -62,9 +52,9 @@ class HashServer:
             'Accuracy64': f2i(accuracy),
             'AuthTicket': b64encode(authticket),
             'SessionData': b64encode(sessiondata),
-            'Requests': tuple(b64encode(x.SerializeToString()) for x in requests)
+            'Requests': [b64encode(x.SerializeToString()) for x in requests]
         }
-        payload = json.dumps(payload, **jargs)
+        payload = json_dumps(payload)
 
         # request hashes from hashing server
         try:
@@ -93,8 +83,8 @@ class HashServer:
                 headers = resp.headers
 
                 try:
-                    response = await resp.json(encoding='ascii', loads=json.loads)
-                except jexc as e:
+                    response = await resp.json(encoding='ascii', loads=json_loads)
+                except ValueError as e:
                     raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
         except (TimeoutException, TimeoutError) as e:
             raise HashingTimeoutException('Hashing request timed out.') from e
@@ -112,9 +102,9 @@ class HashServer:
             pass
 
         try:
-            self.location_auth_hash = c_int32(response['locationAuthHash']).value
-            self.location_hash = c_int32(response['locationHash']).value
-            self.request_hashes = tuple(c_int64(x).value for x in response['requestHashes'])
+            return (c_int32(response['locationHash']).value,
+                    c_int32(response['locationAuthHash']).value,
+                    [c_int64(x).value for x in response['requestHashes']])
         except CancelledError:
             raise
         except Exception as e:
@@ -138,7 +128,7 @@ class HashServer:
         conn = TimedConnector(loop=cls.loop,
                               limit=conn_limit,
                               verify_ssl=False,
-                              conn_timeout=6)
+                              conn_timeout=6.0)
         cls._session = ClientSession(connector=conn,
                                      loop=cls.loop,
                                      headers=headers)

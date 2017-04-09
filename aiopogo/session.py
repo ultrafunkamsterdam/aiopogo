@@ -37,7 +37,7 @@ class SessionManager:
         self.loop = loop or get_event_loop()
         self.sessions = {}
 
-    def get(self, proxy=None, headers={'User-Agent': 'Niantic App'}):
+    def get(self, proxy=None):
         try:
             return self.sessions[proxy]
         except KeyError:
@@ -51,7 +51,10 @@ class SessionManager:
 
             self.sessions[proxy] = ClientSession(connector=conn,
                                                  loop=self.loop,
-                                                 headers=headers)
+                                                 headers=(
+                                                     ('Content-Type', 'application/x-www-form-urlencoded'),
+                                                     ('User-Agent', 'Niantic App'),
+                                                     ('Accept-Language', 'en-us')))
             return self.sessions[proxy]
 
     def close(self):

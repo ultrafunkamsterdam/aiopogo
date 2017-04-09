@@ -33,17 +33,6 @@ def get_time_ms():
     return int(time() * 1000)
 
 
-def get_format_time_diff(low, high, ms=True):
-    diff = (high - low)
-    if ms:
-        m, s = divmod(diff / 1000, 60)
-    else:
-        m, s = divmod(diff, 60)
-    h, m = divmod(m, 60)
-
-    return (h, m, s)
-
-
 def parse_api_endpoint(api_url):
     if not api_url.startswith("https"):
         api_url = 'https://{}/rpc'.format(api_url)
