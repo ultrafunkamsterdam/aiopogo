@@ -2,7 +2,6 @@ from time import time
 from json import JSONEncoder
 from array import array
 from logging import getLogger
-from random import Random
 from bisect import bisect
 from struct import pack, unpack
 
@@ -55,32 +54,3 @@ class IdGenerator:
     def request_id(self):
         self.request += 1
         return (self.next() << 32) | self.request
-
-
-class CustomRandom(Random):
-    def choose_weighted(self, population, cum_weights):
-        """Return an item from population according to provided weights.
-        """
-        if len(cum_weights) != len(population):
-            raise ValueError('The number of weights does not match the population')
-        total = cum_weights[-1]
-        return population[bisect(cum_weights, self.random() * total)]
-
-    def triangular_int(self, low, high, mode):
-        """Triangular distribution.
-
-        Continuous distribution bounded by given lower and upper limits,
-        and having a given mode value in-between.
-
-        http://en.wikipedia.org/wiki/Triangular_distribution
-        """
-        u = self.random()
-        try:
-            c = (mode - low) / (high - low)
-        except ZeroDivisionError:
-            return low
-        if u > c:
-            u = 1 - u
-            c = 1 - c
-            low, high = high, low
-        return int(low + (high - low) * (u * c) ** 0.5)

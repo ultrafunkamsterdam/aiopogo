@@ -10,9 +10,10 @@ from google.protobuf import message
 from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientError, DisconnectedError, HttpProcessingError, ProxyConnectionError
 from pycrypt import pycrypt
+from cyrandom import choose_weighted, randint, random, triangular, triangular_int, uniform
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time_ms, IdGenerator, CustomRandom
+from .utilities import to_camel_case, get_time_ms, IdGenerator
 from .hash_server import HashServer
 from .session import SessionManager
 
@@ -24,9 +25,6 @@ from networking.envelopes.signal_log_pb2 import SignalLog
 from networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
 from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
-
-
-rand = CustomRandom()
 
 
 class RpcApi:
@@ -131,11 +129,11 @@ class RpcApi:
         request.request_id = self.state.request_id
 
         # 5: 43%, 10: 30%, 30: 5%, 50: 4%, 65: 10%, 200: 1%, float: 7%
-        request.accuracy = rand.choose_weighted(
+        request.accuracy = choose_weighted(
             (5, 10, 30, 50, 65, 200, -1),
             (43, 73, 78, 82, 92, 93, 100))
         if request.accuracy == -1:
-            request.accuracy = rand.uniform(65, 200)
+            request.accuracy = uniform(65, 200)
 
         request.latitude, request.longitude, altitude = player_position
 
@@ -152,7 +150,7 @@ class RpcApi:
             request.auth_info.token.contents = await self._auth_provider.get_access_token()
 
             # 59: 50%, others: 5% each
-            request.auth_info.token.unknown2 = rand.choose_weighted(
+            request.auth_info.token.unknown2 = choose_weighted(
                 (4, 19, 22, 26, 30, 44, 45, 50, 57, 58, 59),
                 (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20))
             ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
@@ -162,7 +160,7 @@ class RpcApi:
         sig.field22 = self.state.session_hash
         sig.epoch_timestamp_ms = get_time_ms()
         if not self.state.start_time:
-            self.state.start_time = sig.epoch_timestamp_ms - rand.randint(6000, 10000)
+            self.state.start_time = sig.epoch_timestamp_ms - randint(6000, 10000)
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
 
         hash_engine = HashServer()
@@ -171,48 +169,48 @@ class RpcApi:
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
 
-        sen.timestamp = sig.timestamp_ms_since_start - rand.triangular_int(93, 4900, 3000)
-        loc.timestamp_ms = sig.timestamp_ms_since_start - rand.triangular_int(320, 3000, 1000)
+        sen.timestamp = sig.timestamp_ms_since_start - triangular_int(93, 4900, 3000)
+        loc.timestamp_ms = sig.timestamp_ms_since_start - triangular_int(320, 3000, 1000)
 
         loc.name = 'fused'
         loc.latitude = request.latitude
         loc.longitude = request.longitude
 
-        loc.altitude = altitude or rand.uniform(150, 250)
+        loc.altitude = altitude or uniform(150, 250)
 
-        if rand.random() > .85:
+        if random() > .85:
             # no reading for roughly 1 in 7 updates
             loc.device_course = -1
             loc.device_speed = -1
         else:
             loc.device_course = self.state.course
-            loc.device_speed = rand.triangular(0.25, 9.7, 8.2)
+            loc.device_speed = triangular(0.25, 9.7, 8.2)
 
         loc.provider_status = 3
         loc.location_type = 1
         if isinstance(request.accuracy, float):
-            loc.horizontal_accuracy = rand.choose_weighted((request.accuracy, 65, 200), (50, 90, 100))
-            loc.vertical_accuracy = rand.choose_weighted(
+            loc.horizontal_accuracy = choose_weighted((request.accuracy, 65, 200), (50, 90, 100))
+            loc.vertical_accuracy = choose_weighted(
                 (-1, 10, 12, 16, 24, 32, 48, 96),
                 (50, 84, 89, 92, 96, 98, 99, 100))
         else:
             loc.horizontal_accuracy = request.accuracy
             if request.accuracy >= 10:
-                loc.vertical_accuracy = rand.choose_weighted(
+                loc.vertical_accuracy = choose_weighted(
                     (6, 8, 10, 12, 16, 24, 32, 48),
                     (4, 38, 73, 84, 88, 96, 99, 100))
             else:
-                loc.vertical_accuracy = rand.choose_weighted(
+                loc.vertical_accuracy = choose_weighted(
                     (3, 4, 6, 8, 10, 12),
                     (15, 54, 68, 81, 95, 100))
 
         if loc.vertical_accuracy == -1:
-            loc.vertical_accuracy = rand.uniform(10, 96)
+            loc.vertical_accuracy = uniform(10, 96)
 
-        sen.acceleration_x = rand.triangular(-1.5, 2.5, 0)
-        sen.acceleration_y = rand.triangular(-1.2, 1.4, 0)
-        sen.acceleration_z = rand.triangular(-1.4, .9, 0)
-        sen.magnetic_field_accuracy = rand.choose_weighted(
+        sen.acceleration_x = triangular(-1.5, 2.5, 0)
+        sen.acceleration_y = triangular(-1.2, 1.4, 0)
+        sen.acceleration_z = triangular(-1.4, .9, 0)
+        sen.magnetic_field_accuracy = choose_weighted(
             (-1, 0, 1, 2),
             (8, 10, 52, 100))
         if sen.magnetic_field_accuracy == -1:
@@ -224,15 +222,15 @@ class RpcApi:
             sen.magnetic_field_y = self.state.magnetic_field_y
             sen.magnetic_field_z = self.state.magnetic_field_z
 
-        sen.attitude_pitch = rand.triangular(-1.56, 1.57, 0.475)
-        sen.attitude_yaw = rand.triangular(-1.56, 3.14, .1)
-        sen.attitude_roll = rand.triangular(-3.14, 3.14, 0)
-        sen.rotation_rate_x = rand.triangular(-3.2, 3.52, 0)
-        sen.rotation_rate_y = rand.triangular(-3.1, 4.88, 0)
-        sen.rotation_rate_z = rand.triangular(-6, 3.7, 0)
-        sen.gravity_x = rand.triangular(-1, 1, 0.01)
-        sen.gravity_y = rand.triangular(-1, 1, -.4)
-        sen.gravity_z = rand.triangular(-1, 1, -.4)
+        sen.attitude_pitch = triangular(-1.56, 1.57, 0.475)
+        sen.attitude_yaw = triangular(-1.56, 3.14, .1)
+        sen.attitude_roll = triangular(-3.14, 3.14, 0)
+        sen.rotation_rate_x = triangular(-3.2, 3.52, 0)
+        sen.rotation_rate_y = triangular(-3.1, 4.88, 0)
+        sen.rotation_rate_z = triangular(-6, 3.7, 0)
+        sen.gravity_x = triangular(-1, 1, 0.01)
+        sen.gravity_y = triangular(-1, 1, -.4)
+        sen.gravity_z = triangular(-1, 1, -.4)
         sen.status = 3
 
         sig.version_hash = 1296456256998993698
@@ -249,7 +247,7 @@ class RpcApi:
         except (IndexError, AttributeError):
             pass
         else:
-            randval = rand.random()
+            randval = random()
             # GetMapObjects or GetPlayer: 50%
             # Encounter: 10%
             # Others: 3%
@@ -422,13 +420,13 @@ class RpcState:
         self.start_time = None
         self.id_gen = IdGenerator()
         self.session_hash = urandom(16)
-        self.mag_x_min = rand.uniform(-80, 60)
+        self.mag_x_min = uniform(-80, 60)
         self.mag_x_max = self.mag_x_min + 20
-        self.mag_y_min = rand.uniform(-120, 90)
+        self.mag_y_min = uniform(-120, 90)
         self.mag_y_max = self.mag_y_min + 30
-        self.mag_z_min = rand.uniform(-70, 40)
+        self.mag_z_min = uniform(-70, 40)
         self.mag_z_max = self.mag_y_min + 15
-        self._course = rand.uniform(0, 359.99)
+        self._course = uniform(0, 359.99)
         self.message8 = None
 
     @property
@@ -437,19 +435,19 @@ class RpcState:
 
     @property
     def magnetic_field_x(self):
-        return rand.uniform(self.mag_x_min, self.mag_x_max)
+        return uniform(self.mag_x_min, self.mag_x_max)
 
     @property
     def magnetic_field_y(self):
-        return rand.uniform(self.mag_y_min, self.mag_y_max)
+        return uniform(self.mag_y_min, self.mag_y_max)
 
     @property
     def magnetic_field_z(self):
-        return rand.uniform(self.mag_z_min, self.mag_z_max)
+        return uniform(self.mag_z_min, self.mag_z_max)
 
     @property
     def course(self):
-        self._course = rand.triangular(0, 359.99, self._course)
+        self._course = triangular(0, 359.99, self._course)
         return self._course
 
 
