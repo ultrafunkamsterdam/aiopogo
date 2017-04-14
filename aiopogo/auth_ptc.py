@@ -2,13 +2,14 @@ from urllib.parse import parse_qs, urlsplit
 from asyncio import TimeoutError, CancelledError
 from time import time
 from functools import partial
+from html import unescape
 
 from aiohttp import TCPConnector, ClientSession, ClientError, DisconnectedError, HttpProcessingError
 
 from . import json_loads
 from .session import socks_connector
 from .auth import Auth
-from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, SocksError, TimeoutException
+from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, SocksError, TimeoutException, UnexpectedAuthError
 
 class AuthPtc(Auth):
     def __init__(self, username=None, password=None, proxy=None, timeout=None, locale=None):
@@ -56,7 +57,7 @@ class AuthPtc(Auth):
                 except TypeError as e:
                     raise AuthException('Invalid initial JSON response.') from e
 
-                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize'}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=self.timeout, proxy=self.proxy, allow_redirects=False) as resp:
+                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize'}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, allow_redirects=False) as resp:
                     resp.raise_for_status()
                     try:
                         self._access_token = resp.cookies['CASTGC'].value
@@ -69,7 +70,9 @@ class AuthPtc(Auth):
                             if j.get('error_code') == 'users.login.activation_required':
                                 raise ActivationRequiredException('Account email not verified.')
                             error = j['errors'][0]
-                            raise AuthException(error)
+                            if 'unexpected error' in error:
+                                raise UnexpectedAuthError('Unexpected auth error')
+                            raise AuthException(unescape(error))
                         except (AttributeError, KeyError, IndexError) as e:
                             raise AuthException('Unable to login or get error information.') from e
 

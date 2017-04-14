@@ -25,6 +25,9 @@ class ActivationRequiredException(AuthException):
 class AuthTimeoutException(AuthException, TimeoutException):
     """Raised when an auth request times out."""
 
+class UnexpectedAuthError(AuthException):
+    """Raised when the auth server returns an unexpected error."""
+
 
 class AuthTokenExpiredException(AiopogoError):
     """Raised when your auth token has expired (code 102)"""
