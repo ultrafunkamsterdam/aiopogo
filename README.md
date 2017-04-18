@@ -27,7 +27,7 @@ Documentation is available at the [pgoapi wiki](https://wiki.pogodev.org).
  * protobuf (≥3)
  * gpsoauth
  * pycrypt
- * pogeo
+ * cyrandom
 
 ## Contribution
 Contributions are very welcome, feel free to submit a pull request.

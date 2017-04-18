@@ -1,13 +1,6 @@
 from time import time
 from json import JSONEncoder
-from array import array
-from logging import getLogger
-from bisect import bisect
 from struct import pack, unpack
-
-from pogeo import get_cell_ids
-
-log = getLogger(__name__)
 
 
 def f2i(f):
@@ -22,10 +15,6 @@ def to_camel_case(value):
 class JSONByteEncoder(JSONEncoder):
     def default(self, o):
         return o.decode('ascii')
-
-
-def get_cell_ids_compact(lat, lon, radius=500):
-    return array('Q', get_cell_ids(lat, lon, radius))
 
 
 def get_time_ms():
