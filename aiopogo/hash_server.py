@@ -9,7 +9,7 @@ from struct import pack, unpack
 from aiohttp import ClientSession, ClientError, ClientResponseError, ServerConnectionError, ServerTimeoutError
 
 from . import json_dumps, json_loads
-from .exceptions import ExpiredHashKeyException, HashingOfflineException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
+from .exceptions import BadHashRequestException, ExpiredHashKeyException, HashingOfflineException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .connector import TimedConnector
 from .utilities import f2i
 
@@ -58,31 +58,38 @@ class HashServer:
         for attempt in range(2):
             try:
                 async with self._session.post("http://pokehash.buddyauth.com/api/v131_0/hash", headers=headers, json=payload) as resp:
-                    try:
-                        response = await resp.json(encoding='ascii', loads=json_loads)
-                    except ValueError as e:
-                        raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
+                    if 400 <= resp.status:
+                        if resp.status == 400:
+                            response = await resp.text()
+                            if response == 'Unauthorized':
+                                if self.multi:
+                                    self.log.warning('{:.10}... expired, removing from rotation.'.format(self.instance_token))
+                                    self.remove_token(self.instance_token)
+                                    if attempt < 1:
+                                        self.instance_token = self.auth_token
+                                        headers = {'X-AuthToken': self.instance_token}
+                                        continue
+                                    return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+                                raise ExpiredHashKeyException("{:.10}... appears to have expired.".format(self.instance_token))
+                            raise BadHashRequestException('400 was returned from the hashing server with the message: {}'.format(response))
+                        raise ClientResponseError(code=resp.status, message=resp.reason)
+
+                    response = await resp.json(encoding='ascii', loads=json_loads)
                     headers = resp.headers
                     break
             except ClientResponseError as e:
-                if e.code == 400:
-                    if self.multi:
-                        self.log.warning('{} expired, removing from rotation.'.format(self.instance_token))
-                        self.remove_token(self.instance_token)
-                        self.instance_token = self.auth_token
-                        return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
-                    text = await resp.text()
-                    raise ExpiredHashKeyException("Hash key appears to have expired. {}".format(text))
-                elif e.code == 403:
+                if e.code == 403:
                     raise TempHashingBanException('Your IP was temporarily banned for sending too many requests with invalid keys')
                 elif e.code == 429:
                     status['remaining'] = 0
                     self.instance_token = self.auth_token
                     return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
-                elif e.code >= 500:
+                elif e.code >= 500 or e.code == 404:
                     raise HashingOfflineException('Hashing server error {}: {}'.format(e.code, e.message))
                 else:
                     raise UnexpectedHashResponseException('Unexpected hash code {}: {}'.format(e.code, e.message))
+            except ValueError as e:
+                raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
             except (TimeoutError, ServerConnectionError, ServerTimeoutError) as e:
                 if attempt < 1:
                     self.log.info('Hashing request timed out.')
@@ -135,7 +142,7 @@ class HashServer:
         cls._session = ClientSession(connector=conn,
                                      loop=cls.loop,
                                      headers=headers,
-                                     raise_for_status=True,
+                                     raise_for_status=False,
                                      conn_timeout=4.5,
                                      json_serialize=json_dumps)
 
