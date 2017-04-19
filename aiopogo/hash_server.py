@@ -126,17 +126,17 @@ class HashServer:
     def activate_session(cls, conn_limit=300):
         if cls._session and not cls._session.closed:
             return
-        headers = (('Content-Type', 'application/json'),
-                   ('Accept', 'application/json'),
-                   ('User-Agent', 'Python aiopogo'))
         conn = TimedConnector(loop=cls.loop,
                               limit=conn_limit,
                               verify_ssl=False)
+        headers = (('Content-Type', 'application/json'),
+                   ('Accept', 'application/json'),
+                   ('User-Agent', 'Python aiopogo'))
         cls._session = ClientSession(connector=conn,
                                      loop=cls.loop,
                                      headers=headers,
                                      raise_for_status=True,
-                                     conn_timeout=6.0,
+                                     conn_timeout=4.5,
                                      json_serialize=json_dumps)
 
     @classmethod

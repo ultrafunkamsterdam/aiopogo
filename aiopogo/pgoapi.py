@@ -50,7 +50,7 @@ class PGoApi:
 
     def activate_hash_server(self, hash_token, conn_limit=300):
         HashServer.set_token(hash_token)
-        HashServer.activate_session(conn_limit=conn_limit)
+        HashServer.activate_session(conn_limit)
 
     @property
     def position(self):

@@ -16,7 +16,7 @@ setup(name='aiopogo',
           'aiohttp>=2.0.7,<2.1',
           'pycrypt>=0.5.0',
           'cyrandom>=0.1.2'],
-      extras_require={'ujson': ['ujson']},
+      extras_require={'ujson': ['ujson'], 'socks': ['aiosocks>=0.2.2']},
       license='MIT',
       classifiers=[
           'Development Status :: 5 - Production/Stable',

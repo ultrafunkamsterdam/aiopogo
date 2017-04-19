@@ -25,12 +25,13 @@ except ImportError:
     from .utilities import JSONByteEncoder
     json_dumps = _partial(_dumps, cls=JSONByteEncoder)
 
+from .session import SESSIONS
 from .pgoapi import PGoApi
 from .rpc_api import RpcApi
 from .hash_server import HashServer
 
 def close_sessions():
-    RpcApi.sessions.close()
+    SESSIONS.close()
     HashServer.close_session()
 
 def activate_hash_server(hash_token, conn_limit=300):

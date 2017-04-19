@@ -15,7 +15,7 @@ from cyrandom import choose_weighted, randint, random, triangular, triangular_in
 from .exceptions import *
 from .utilities import to_camel_case, get_time_ms, IdGenerator
 from .hash_server import HashServer
-from .session import SessionManager
+from .session import SESSIONS
 
 from .protos.pogoprotos import networking
 from networking.envelopes.request_envelope_pb2 import RequestEnvelope
@@ -29,25 +29,19 @@ from networking.platform.responses.plat_eight_response_pb2 import PlatEightRespo
 
 class RpcApi:
     log = getLogger(__name__)
-    sessions = SessionManager()
 
     def __init__(self, auth_provider, state):
         self._auth_provider = auth_provider
         self.state = state
 
-    def get_class(self, cls):
-        module_, class_ = cls.rsplit('.', 1)
-        class_ = getattr(import_module(module_), to_camel_case(class_))
-        return class_
+    def get_class(self, class_):
+        module_, class_ = class_.rsplit('.', 1)
+        return getattr(import_module(module_), to_camel_case(class_))
 
     async def _make_rpc(self, endpoint, request_proto_plain, proxy):
         self.log.debug('Execution of RPC')
 
-        if proxy and proxy.startswith('socks'):
-            session = self.sessions.get(proxy)
-            proxy = None
-        else:
-            session = self.sessions.get()
+        session = SESSIONS.get(proxy)
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
@@ -330,7 +324,6 @@ class RpcApi:
                 raise BadRequestException('Unknown value in request list')
 
         return mainrequest
-
 
     def _parse_main_response(self, response_raw, subrequests):
         self.log.debug('Parsing main RPC response...')

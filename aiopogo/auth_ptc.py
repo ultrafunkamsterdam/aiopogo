@@ -1,12 +1,11 @@
 from asyncio import TimeoutError
 from time import time
-from functools import partial
 from html import unescape
 
-from aiohttp import TCPConnector, ClientSession, ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
+from aiohttp import ClientRequest, ClientSession, ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
 
 from . import json_loads
-from .session import socks_connector
+from .session import SESSIONS, ProxyClientRequest
 from .auth import Auth
 from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, SocksError, UnexpectedAuthError
 
@@ -18,22 +17,10 @@ class AuthPtc(Auth):
         self._username = username
         self._password = password
         self.locale = locale or 'en_US'
+        self.timeout = timeout or 10.0
 
-        if proxy and proxy.startswith('socks'):
-            self.conn = partial(socks_connector, proxy=proxy, loop=self.loop)
-            self.proxy = None
-        else:
-            self.conn = partial(TCPConnector, loop=self.loop, verify_ssl=False)
-            self.proxy = proxy
-
-        self.sess = partial(
-            ClientSession,
-            loop=self.loop,
-            headers=(('User-Agent', 'niantic'), ('Host', 'sso.pokemon.com')),
-            skip_auto_headers=('Accept', 'Accept-Encoding'),
-            raise_for_status=True,
-            conn_timeout=5.0,
-            read_timeout=timeout or 10.0)
+        self.proxy = proxy
+        self.socks = proxy and proxy.startswith('socks')
 
     async def user_login(self, username=None, password=None):
         self._username = username or self._username
@@ -47,7 +34,16 @@ class AuthPtc(Auth):
 
         try:
             now = time()
-            async with self.sess(connector=self.conn()) as session:
+            async with ClientSession(
+                    connector=SESSIONS.get_connector(self.socks),
+                    loop=self.loop,
+                    headers=(('User-Agent', 'niantic'), ('Host', 'sso.pokemon.com')),
+                    skip_auto_headers=('Accept', 'Accept-Encoding'),
+                    request_class=ProxyClientRequest if self.socks else ClientRequest,
+                    connector_owner=False,
+                    raise_for_status=True,
+                    conn_timeout=5.0,
+                    read_timeout=self.timeout) as session:
                 async with session.get('https://sso.pokemon.com/sso/oauth2.0/authorize', params={'client_id': 'mobile-app_pokemon-go', 'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error', 'locale': self.locale}, proxy=self.proxy) as resp:
                     data = await resp.json(loads=json_loads, encoding='utf-8', content_type=None)
 
@@ -81,7 +77,6 @@ class AuthPtc(Auth):
         except (TimeoutError, ServerTimeoutError) as e:
             raise AuthTimeoutException('user_login timeout.') from e
         except ClientError as e:
-            err = e.__cause__ or e
             raise AuthConnectionException('{} during user_login.'.format(e.__class__.__name__)) from e
         except (AssertionError, TypeError, ValueError) as e:
             raise AuthException('Invalid initial JSON response.') from e
