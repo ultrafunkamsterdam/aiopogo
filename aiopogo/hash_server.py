@@ -65,8 +65,8 @@ class HashServer:
                                 if self.multi:
                                     self.log.warning('{:.10}... expired, removing from rotation.'.format(self.instance_token))
                                     self.remove_token(self.instance_token)
+                                    self.instance_token = self.auth_token
                                     if attempt < 1:
-                                        self.instance_token = self.auth_token
                                         headers = {'X-AuthToken': self.instance_token}
                                         continue
                                     return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
