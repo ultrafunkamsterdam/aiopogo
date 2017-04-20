@@ -33,8 +33,8 @@ class PGoApi:
         self.longitude = lon
         self.altitude = alt
 
-        self.proxy = proxy
         self.proxy_auth = None
+        self.proxy = proxy
         self.device_info = device_info
 
     async def set_authentication(self, provider='ptc', username=None, password=None, timeout=10, locale='en_US', refresh_token=None):
