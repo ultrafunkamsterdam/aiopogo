@@ -83,7 +83,7 @@ class HashServer:
                 elif e.code == 429:
                     status['remaining'] = 0
                     self.instance_token = self.auth_token
-                    return self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+                    return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
                 elif e.code >= 500 or e.code == 404:
                     raise HashingOfflineException('Hashing server error {}: {}'.format(e.code, e.message))
                 else:

@@ -1,5 +1,5 @@
 __title__ = 'aiopogo'
-__version__ = '1.8.2'
+__version__ = '1.8.3'
 __author__ = 'David Christenson'
 __license__ = 'MIT License'
 __copyright__ = 'Copyright (c) 2017 David Christenson <https://github.com/Noctem>'
