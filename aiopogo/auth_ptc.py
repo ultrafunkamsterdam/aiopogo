@@ -10,7 +10,7 @@ from .auth import Auth
 from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, SocksError, UnexpectedAuthError
 
 class AuthPtc(Auth):
-    def __init__(self, username=None, password=None, proxy=None, timeout=None, locale=None):
+    def __init__(self, username=None, password=None, proxy=None, proxy_auth=None, timeout=None, locale=None):
         Auth.__init__(self)
         self.provider = 'ptc'
 
@@ -20,7 +20,8 @@ class AuthPtc(Auth):
         self.timeout = timeout or 10.0
 
         self.proxy = proxy
-        self.socks = proxy and proxy.startswith('socks')
+        self.socks = proxy and proxy.scheme in ('socks4', 'socks5')
+        self.proxy_auth = proxy_auth
 
     async def user_login(self, username=None, password=None):
         self._username = username or self._username
@@ -44,7 +45,7 @@ class AuthPtc(Auth):
                     raise_for_status=True,
                     conn_timeout=5.0,
                     read_timeout=self.timeout) as session:
-                async with session.get('https://sso.pokemon.com/sso/oauth2.0/authorize', params={'client_id': 'mobile-app_pokemon-go', 'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error', 'locale': self.locale}, proxy=self.proxy) as resp:
+                async with session.get('https://sso.pokemon.com/sso/oauth2.0/authorize', params={'client_id': 'mobile-app_pokemon-go', 'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error', 'locale': self.locale}, proxy=self.proxy, proxy_auth=self.proxy_auth) as resp:
                     data = await resp.json(loads=json_loads, encoding='utf-8', content_type=None)
 
                     assert 'lt' in data
@@ -53,7 +54,7 @@ class AuthPtc(Auth):
                     data['password'] = self._password
                     data['locale'] = self.locale
 
-                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize'}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, allow_redirects=False) as resp:
+                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize'}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False) as resp:
                     try:
                         self._access_token = resp.cookies['CASTGC'].value
                     except (AttributeError, KeyError, TypeError):

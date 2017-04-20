@@ -38,14 +38,14 @@ class RpcApi:
         module_, class_ = class_.rsplit('.', 1)
         return getattr(import_module(module_), to_camel_case(class_))
 
-    async def _make_rpc(self, endpoint, request_proto_plain, proxy):
+    async def _make_rpc(self, endpoint, request_proto_plain, proxy, proxy_auth):
         self.log.debug('Execution of RPC')
 
         session = SESSIONS.get(proxy)
 
         request_proto_serialized = request_proto_plain.SerializeToString()
         try:
-            async with session.post(endpoint, data=request_proto_serialized, proxy=proxy) as resp:
+            async with session.post(endpoint, data=request_proto_serialized, proxy=proxy, proxy_auth=proxy_auth) as resp:
                 return await resp.read()
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException('Proxy connection error during RPC request.') from e
@@ -77,10 +77,10 @@ class RpcApi:
         except (ValueError, TypeError):
             return 'unknown'
 
-    async def request(self, endpoint, subrequests, player_position, device_info=None, proxy=None):
+    async def request(self, endpoint, subrequests, player_position, device_info=None, proxy=None, proxy_auth=None):
         request_proto = await self._build_main_request(subrequests, player_position, device_info)
 
-        response = await self._make_rpc(endpoint, request_proto, proxy)
+        response = await self._make_rpc(endpoint, request_proto, proxy, proxy_auth)
         response_dict = self._parse_main_response(response, subrequests)
 
         if 'auth_ticket' in response_dict:

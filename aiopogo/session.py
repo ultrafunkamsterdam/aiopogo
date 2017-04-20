@@ -17,7 +17,7 @@ class SessionManager:
         self.loop = get_event_loop()
 
     def get(self, proxy=None):
-        socks = proxy and proxy.startswith('socks')
+        socks = proxy and proxy.scheme in ('socks4', 'socks5')
         try:
             return self.socks_session if socks else self.session
         except AttributeError:

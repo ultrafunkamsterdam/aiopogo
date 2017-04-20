@@ -21,12 +21,6 @@ def get_time_ms():
     return int(time() * 1000)
 
 
-def parse_api_endpoint(api_url):
-    if not api_url.startswith("https"):
-        api_url = 'https://{}/rpc'.format(api_url)
-    return api_url
-
-
 class IdGenerator:
     '''Lehmer random number generator'''
     M = 0x7fffffff  # 2^31 - 1 (A large prime number)

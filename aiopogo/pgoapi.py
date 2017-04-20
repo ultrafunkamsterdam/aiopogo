@@ -1,10 +1,19 @@
 from logging import getLogger
 
+from yarl import URL
+from aiohttp import BasicAuth
+try:
+    from aiosocks import Socks4Auth, Socks5Auth
+except ImportError:
+    class Socks4Auth(Exception):
+        def __init__(*args, **kwargs):
+            raise ImportError('You must install aiosocks to use a SOCKS proxy.')
+    Socks5Auth = Socks4Auth
+
 from . import __title__, __version__
 from .rpc_api import RpcApi, RpcState
 from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
-from .utilities import parse_api_endpoint
 from .hash_server import HashServer
 from .exceptions import AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, ServerApiEndpointRedirectException
 from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
@@ -25,11 +34,12 @@ class PGoApi:
         self.altitude = alt
 
         self.proxy = proxy
+        self.proxy_auth = None
         self.device_info = device_info
 
-    async def set_authentication(self, provider='ptc', username=None, password=None, proxy=None, timeout=10, locale='en_US', refresh_token=None):
+    async def set_authentication(self, provider='ptc', username=None, password=None, timeout=10, locale='en_US', refresh_token=None):
         if provider == 'ptc':
-            self.auth_provider = AuthPtc(username, password, proxy=proxy or self.proxy, timeout=timeout)
+            self.auth_provider = AuthPtc(username, password, proxy=self._proxy, proxy_auth=self.proxy_auth, timeout=timeout)
         elif provider == 'google':
             self.auth_provider = AuthGoogle(proxy=proxy, refresh_token=refresh_token)
             if refresh_token:
@@ -63,9 +73,30 @@ class PGoApi:
     @api_endpoint.setter
     def api_endpoint(self, api_url):
         if api_url.startswith("https"):
-            self._api_endpoint = api_url
+            self._api_endpoint = URL(api_url)
         else:
-            self._api_endpoint = parse_api_endpoint(api_url)
+            self._api_endpoint = URL('https://' + api_url + '/rpc')
+
+    @property
+    def proxy(self):
+        return self._proxy
+
+    @proxy.setter
+    def proxy(self, proxy):
+        if proxy is None:
+            self._proxy = proxy
+        else:
+            self._proxy = URL(proxy)
+            if self._proxy.user:
+                scheme = self._proxy.scheme
+                if scheme == 'http':
+                    self.proxy_auth = BasicAuth(self._proxy.user, self._proxy.password)
+                elif scheme == 'socks5':
+                    self.proxy_auth = Socks5Auth(self._proxy.user, self._proxy.password)
+                elif scheme == 'socks4':
+                    self.proxy_auth = Socks4Auth(self._proxy.user)
+                else:
+                    raise ValueError('Proxy protocol must be http, socks5, or socks4.')
 
     @property
     def start_time(self):
@@ -102,7 +133,7 @@ class PGoApiRequest:
         request = RpcApi(auth_provider, parent.state)
         while True:
             try:
-                response = await request.request(parent.api_endpoint, self._req_method_list, position, parent.device_info, parent.proxy)
+                response = await request.request(parent.api_endpoint, self._req_method_list, position, parent.device_info, parent._proxy, parent.proxy_auth)
                 break
             except AuthTokenExpiredException:
                 self.log.info('Access token rejected! Requesting new one...')
