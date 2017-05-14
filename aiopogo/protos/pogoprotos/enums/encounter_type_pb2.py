@@ -22,7 +22,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n%pogoprotos/enums/encounter_type.proto\x12\x10pogoprotos.enums*7\n\rEncounterType\x12\x0f\n\x0bSPAWN_POINT\x10\x00\x12\x0b\n\x07INCENSE\x10\x01\x12\x08\n\x04\x44ISK\x10\x02\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _ENCOUNTERTYPE = _descriptor.EnumDescriptor(
   name='EncounterType',
@@ -57,6 +56,7 @@ DISK = 2
 
 
 DESCRIPTOR.enum_types_by_name['EncounterType'] = _ENCOUNTERTYPE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 # @@protoc_insertion_point(module_scope)

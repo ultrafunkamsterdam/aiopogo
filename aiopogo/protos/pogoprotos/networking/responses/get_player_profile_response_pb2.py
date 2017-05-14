@@ -23,7 +23,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   serialized_pb=_b('\nApogoprotos/networking/responses/get_player_profile_response.proto\x12\x1fpogoprotos.networking.responses\x1a\"pogoprotos/data/player_badge.proto\"\xd0\x01\n\x18GetPlayerProfileResponse\x12P\n\x06result\x18\x01 \x01(\x0e\x32@.pogoprotos.networking.responses.GetPlayerProfileResponse.Result\x12\x12\n\nstart_time\x18\x02 \x01(\x03\x12,\n\x06\x62\x61\x64ges\x18\x03 \x03(\x0b\x32\x1c.pogoprotos.data.PlayerBadge\" \n\x06Result\x12\t\n\x05UNSET\x10\x00\x12\x0b\n\x07SUCCESS\x10\x01\x62\x06proto3')
   ,
   dependencies=[pogoprotos_dot_data_dot_player__badge__pb2.DESCRIPTOR,])
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -99,6 +98,7 @@ _GETPLAYERPROFILERESPONSE.fields_by_name['result'].enum_type = _GETPLAYERPROFILE
 _GETPLAYERPROFILERESPONSE.fields_by_name['badges'].message_type = pogoprotos_dot_data_dot_player__badge__pb2._PLAYERBADGE
 _GETPLAYERPROFILERESPONSE_RESULT.containing_type = _GETPLAYERPROFILERESPONSE
 DESCRIPTOR.message_types_by_name['GetPlayerProfileResponse'] = _GETPLAYERPROFILERESPONSE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GetPlayerProfileResponse = _reflection.GeneratedProtocolMessageType('GetPlayerProfileResponse', (_message.Message,), dict(
   DESCRIPTOR = _GETPLAYERPROFILERESPONSE,

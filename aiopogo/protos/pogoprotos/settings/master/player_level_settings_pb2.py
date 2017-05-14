@@ -21,7 +21,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n6pogoprotos/settings/master/player_level_settings.proto\x12\x1apogoprotos.settings.master\"\x9d\x01\n\x13PlayerLevelSettings\x12\x10\n\x08rank_num\x18\x01 \x03(\x05\x12\x1b\n\x13required_experience\x18\x02 \x03(\x05\x12\x15\n\rcp_multiplier\x18\x03 \x03(\x02\x12\x1c\n\x14max_egg_player_level\x18\x04 \x01(\x05\x12\"\n\x1amax_encounter_player_level\x18\x05 \x01(\x05\x62\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -85,6 +84,7 @@ _PLAYERLEVELSETTINGS = _descriptor.Descriptor(
 )
 
 DESCRIPTOR.message_types_by_name['PlayerLevelSettings'] = _PLAYERLEVELSETTINGS
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 PlayerLevelSettings = _reflection.GeneratedProtocolMessageType('PlayerLevelSettings', (_message.Message,), dict(
   DESCRIPTOR = _PLAYERLEVELSETTINGS,

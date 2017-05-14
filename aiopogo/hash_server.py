@@ -57,7 +57,7 @@ class HashServer:
         # request hashes from hashing server
         for attempt in range(2):
             try:
-                async with self._session.post("http://pokehash.buddyauth.com/api/v131_0/hash", headers=headers, json=payload) as resp:
+                async with self._session.post("http://pokehash.buddyauth.com/api/v133_1/hash", headers=headers, json=payload) as resp:
                     if 400 <= resp.status:
                         if resp.status == 400:
                             response = await resp.text()
