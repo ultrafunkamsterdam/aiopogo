@@ -7,8 +7,8 @@ def f2i(f):
     return unpack('<q', pack('<d', f))[0]
 
 
-def to_camel_case(value):
-    return ''.join(word.capitalize() if word else '_' for word in value.split('_'))
+def to_camel_case(string):
+    return ''.join(word.capitalize() for word in string.split('_'))
 
 
 # JSON Encoder to handle bytes

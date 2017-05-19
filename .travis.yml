@@ -1,9 +1,15 @@
+git:
+  depth: 5
 language: python
-python:
-- '3.5'
-- '3.6'
+matrix:
+  include:
+  - python: '3.5'
+  - python: '3.6'
+  - python: '3.7-dev'
+  allow_failures:
+  - python: 3.7-dev
 install:
-- pip install -r requirements.txt
+- pip install -U -r requirements.txt
 - python setup.py install
 script:
 - python -c 'from aiopogo import auth_google, auth_ptc, auth, connector, exceptions, hash_server, pgoapi, rpc_api, session, utilities'

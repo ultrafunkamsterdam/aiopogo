@@ -140,7 +140,7 @@ class PGoApiRequest:
                 await auth_provider.get_access_token(force_refresh=True)
             except ServerApiEndpointRedirectException as e:
                 self.log.debug('API endpoint redirect... re-executing call')
-                parent.api_endpoint = e.get_redirected_endpoint()
+                parent.api_endpoint = e.endpoint
 
         # cleanup after call execution
         self._req_method_list = []
@@ -158,7 +158,7 @@ class PGoApiRequest:
 
             try:
                 if kwargs:
-                    self._req_method_list.append({RequestType.Value(func): kwargs})
+                    self._req_method_list.append((RequestType.Value(func), kwargs))
                     self.log.debug("Arguments of '%s': \n\r%s", func, kwargs)
                 else:
                     self._req_method_list.append(RequestType.Value(func))

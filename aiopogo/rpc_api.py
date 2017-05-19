@@ -7,7 +7,6 @@ from struct import Struct
 from enum import Enum
 
 from google.protobuf import message
-from protobuf_to_dict import protobuf_to_dict
 from aiohttp import ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
 from pycrypt import pycrypt
 from cyrandom import choose_weighted, randint, random, triangular, triangular_int, uniform
@@ -20,11 +19,11 @@ from .session import SESSIONS
 from .protos.pogoprotos import networking
 from networking.envelopes.request_envelope_pb2 import RequestEnvelope
 from networking.envelopes.response_envelope_pb2 import ResponseEnvelope
-from networking.requests.request_type_pb2 import RequestType
 from networking.envelopes.signal_log_pb2 import SignalLog
 from networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
 from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
+from networking.requests.request_type_pb2 import RequestType
 
 
 class RpcApi:
@@ -34,18 +33,9 @@ class RpcApi:
         self._auth_provider = auth_provider
         self.state = state
 
-    def get_class(self, class_):
-        module_, class_ = class_.rsplit('.', 1)
-        return getattr(import_module(module_), to_camel_case(class_))
-
-    async def _make_rpc(self, endpoint, request_proto_plain, proxy, proxy_auth):
-        self.log.debug('Execution of RPC')
-
-        session = SESSIONS.get(proxy)
-
-        request_proto_serialized = request_proto_plain.SerializeToString()
+    async def _make_rpc(self, endpoint, proto, proxy, proxy_auth, _sessions=SESSIONS):
         try:
-            async with session.post(endpoint, data=request_proto_serialized, proxy=proxy, proxy_auth=proxy_auth) as resp:
+            async with _sessions.get(proxy).post(endpoint, data=proto.SerializeToString(), proxy=proxy, proxy_auth=proxy_auth) as resp:
                 return await resp.read()
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException('Proxy connection error during RPC request.') from e
@@ -67,11 +57,7 @@ class RpcApi:
     def get_request_name(subrequests):
         try:
             first = subrequests[0]
-            if isinstance(first, dict):
-                num = next(iter(first.keys()))
-            else:
-                num = first
-            return to_camel_case(RequestType.Name(num))
+            return to_camel_case(RequestType.Name(first[0] if isinstance(first, tuple) else first))
         except IndexError:
             return 'empty'
         except (ValueError, TypeError):
@@ -81,35 +67,7 @@ class RpcApi:
         request_proto = await self._build_main_request(subrequests, player_position, device_info)
 
         response = await self._make_rpc(endpoint, request_proto, proxy, proxy_auth)
-        response_dict = self._parse_main_response(response, subrequests)
-
-        if 'auth_ticket' in response_dict:
-            self._auth_provider.set_ticket(response_dict['auth_ticket'])
-
-        # some response validations
-        try:
-            status_code = response_dict['status_code']
-            if status_code in (1, 2):
-                return response_dict
-            elif status_code == 102:
-                raise AuthTokenExpiredException
-            elif status_code == 53:
-                api_url = response_dict['api_url']
-                exception = ServerApiEndpointRedirectException()
-                exception.set_redirected_endpoint(api_url)
-                raise exception
-            elif status_code == 3:
-                req_type = self.get_request_name(subrequests)
-                raise BadRPCException("Bad Request on {}".format(req_type))
-            else:
-                err = StatusCode(status_code).name
-                req_type = self.get_request_name(subrequests)
-                raise InvalidRPCException("{} on {}.".format(err, req_type))
-        except ValueError:
-            raise UnexpectedResponseException("Unknown status_code: {}".format(status_code))
-        except (TypeError, KeyError):
-            req_type = self.get_request_name(subrequests)
-            raise UnexpectedResponseException('Could not parse status_code from {} response.'.format(req_type))
+        return self._parse_response(response, subrequests)
 
     async def _build_main_request(self, subrequests, player_position, device_info=None):
         self.log.debug('Generating main RPC request...')
@@ -253,13 +211,10 @@ class RpcApi:
                 plat.request_message = plat8.SerializeToString()
 
         sig.location_hash, sig.location_hash_by_token_seed, rh = await hashing
-
-        for req_hash in rh:
-            sig.request_hashes.append(req_hash)
-
-        signature_proto = sig.SerializeToString()
+        sig.request_hashes.extend(rh)
         sig_request = SendEncryptedSignatureRequest()
-        sig_request.encrypted_signature = pycrypt(signature_proto, sig.timestamp_ms_since_start)
+        sig_request.encrypted_signature = pycrypt(sig.SerializeToString(), sig.timestamp_ms_since_start)
+
         plat = request.platform_requests.add()
         plat.type = 6
         plat.request_message = sig_request.SerializeToString()
@@ -273,59 +228,54 @@ class RpcApi:
         self.log.debug('Generating sub RPC requests...')
 
         for entry in subrequest_list:
-            if isinstance(entry, dict):
-                entry_id = next(iter(entry.keys()))
-                entry_content = entry[entry_id]
+            if isinstance(entry, int):
+                subrequest = mainrequest.requests.add()
+                subrequest.request_type = entry
+            else:
+                entry_id, entry_content = entry
 
-                entry_name = RequestType.Name(entry_id)
+                proto_name = RequestType.Name(entry_id).lower() + '_message'
 
-                proto_name = entry_name.lower() + '_message'
-                proto_classname = 'pogoprotos.networking.requests.messages.' + proto_name + '_pb2.' + proto_name
-                subrequest_extension = self.get_class(proto_classname)()
+                try:
+                    class_ = globals()[proto_name]
+                except KeyError:
+                    globals()[proto_name] = class_ = getattr(import_module('pogoprotos.networking.requests.messages.' + proto_name + '_pb2'), to_camel_case(proto_name))
 
-                self.log.debug("Subrequest class: %s", proto_classname)
+                message = class_()
 
                 for key, value in entry_content.items():
                     if isinstance(value, (list, tuple, array)):
                         self.log.debug("Found sequence: %s - trying as repeated", key)
-                        for i in value:
-                            try:
-                                self.log.debug("%s -> %s", key, i)
-                                r = getattr(subrequest_extension, key)
-                                r.append(i)
-                            except (AttributeError, ValueError) as e:
-                                self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, i, proto_name, e)
+                        try:
+                            r = getattr(message, key)
+                            r.extend(value)
+                        except (AttributeError, ValueError) as e:
+                            self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, i, proto_name, e)
                     elif isinstance(value, dict):
-                        for k in value.keys():
+                        r = getattr(message, key)
+                        for k, v in value.items():
                             try:
-                                r = getattr(subrequest_extension, key)
-                                setattr(r, k, value[k])
+                                setattr(r, k, v)
                             except (AttributeError, ValueError) as e:
                                 self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, str(value), proto_name, e)
                     else:
                         try:
-                            setattr(subrequest_extension, key, value)
+                            setattr(message, key, value)
                         except (AttributeError, ValueError) as e:
+                            self.log.warning('Argument %s with value %s inside %s should be a sequence.', key, value, proto_name)
                             try:
                                 self.log.debug("%s -> %s", key, value)
-                                r = getattr(subrequest_extension, key)
-                                r.append(value)
+                                getattr(message, key).append(value)
                             except (AttributeError, ValueError) as e:
                                 self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, value, proto_name, e)
 
                 subrequest = mainrequest.requests.add()
                 subrequest.request_type = entry_id
-                subrequest.request_message = subrequest_extension.SerializeToString()
-
-            elif isinstance(entry, int):
-                subrequest = mainrequest.requests.add()
-                subrequest.request_type = entry
-            else:
-                raise BadRequestException('Unknown value in request list')
+                subrequest.request_message = message.SerializeToString()
 
         return mainrequest
 
-    def _parse_main_response(self, response_raw, subrequests):
+    def _parse_response(self, response_raw, subrequests):
         self.log.debug('Parsing main RPC response...')
 
         response_proto = ResponseEnvelope()
@@ -336,73 +286,55 @@ class RpcApi:
 
         self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)
 
-        response_proto_dict = protobuf_to_dict(response_proto)
-        response_proto_dict = self._parse_sub_responses(subrequests, response_proto_dict)
+        if response_proto.HasField('auth_ticket'):
+            self._auth_provider.set_ticket(response_proto.auth_ticket)
 
-        if not self.state.message8 and 'platform_returns' in response_proto_dict:
-            for plat_response in response_proto_dict['platform_returns']:
-                if plat_response['type'] == 8:
-                    try:
-                        resp = PlatEightResponse()
-                        resp.ParseFromString(plat_response['response'])
-                        self.state.message8 = resp.message
-                    except KeyError:
-                        pass
+        if not self.state.message8:
+            for plat_response in response_proto.platform_returns:
+                if plat_response.type == 8:
+                    resp = PlatEightResponse()
+                    resp.ParseFromString(plat_response.response)
+                    self.state.message8 = resp.message
                     break
 
-        if not response_proto_dict:
-            raise MalformedNianticResponseException('Could not convert protobuf to dict.')
+        # some response validations
+        status_code = response_proto.status_code
+        if status_code in (1, 2):
+            return self._parse_sub_responses(subrequests, response_proto)
+        elif status_code == 53:
+            raise ServerApiEndpointRedirectException(response_proto.api_url)
+        elif status_code == 102:
+            raise AuthTokenExpiredException
+        elif status_code == 3:
+            req_type = self.get_request_name(subrequests)
+            raise BadRPCException("Bad Request on {}".format(req_type))
+        else:
+            try:
+                err = StatusCode(status_code).name
+            except ValueError:
+                raise UnexpectedResponseException("Unknown status_code: {}".format(status_code))
+            req_type = self.get_request_name(subrequests)
+            raise InvalidRPCException("{} on {}.".format(err, req_type))
 
-        return response_proto_dict
-
-
-    def _parse_sub_responses(self, subrequests_list, response_proto_dict):
+    def _parse_sub_responses(self, subrequests_list, response_proto):
         self.log.debug('Parsing sub RPC responses...')
-        response_proto_dict['responses'] = {}
+        responses = {}
 
-        if response_proto_dict['status_code'] == 53:
-            exception = ServerApiEndpointRedirectException()
-            exception.set_redirected_endpoint(response_proto_dict['api_url'])
-            raise exception
-
-        try:
-            subresponses = response_proto_dict['returns']
-            del response_proto_dict['returns']
-        except KeyError:
-            return response_proto_dict
-
-        for i, subresponse in enumerate(subresponses):
+        for i, subresponse in enumerate(response_proto.returns):
             request_entry = subrequests_list[i]
-            if isinstance(request_entry, int):
-                entry_id = request_entry
-            else:
-                entry_id = next(iter(request_entry.keys()))
 
-            entry_name = RequestType.Name(entry_id)
+            entry_name = RequestType.Name(request_entry if isinstance(request_entry, int) else request_entry[0])
             proto_name = entry_name.lower() + '_response'
-            proto_classname = 'pogoprotos.networking.responses.' + proto_name + '_pb2.' + proto_name
-
-            self.log.debug("Parsing class: %s", proto_classname)
 
             try:
-                subresponse_extension = self.get_class(proto_classname)()
-            except (AttributeError, TypeError):
-                subresponse_extension = None
-                error = 'Protobuf definition for {} not found'.format(proto_classname)
-                subresponse_return = error
-                self.log.warning(error)
-            else:
-                try:
-                    subresponse_extension.ParseFromString(subresponse)
-                    subresponse_return = protobuf_to_dict(subresponse_extension)
-                except (AttributeError, ValueError, TypeError):
-                    error = "Protobuf definition for {} seems not to match".format(proto_classname)
-                    subresponse_return = error
-                    self.log.warning(error)
+                class_ = globals()[proto_name]
+            except KeyError:
+                globals()[proto_name] = class_ = getattr(import_module('pogoprotos.networking.responses.' + proto_name + '_pb2'), to_camel_case(proto_name))
 
-            response_proto_dict['responses'][entry_name] = subresponse_return
-
-        return response_proto_dict
+            message = class_()
+            message.ParseFromString(subresponse)
+            responses[entry_name] = message
+        return responses
 
 
 class RpcState:

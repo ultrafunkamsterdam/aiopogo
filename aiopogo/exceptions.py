@@ -134,11 +134,6 @@ class UnexpectedHashResponseException(UnexpectedResponseException, HashServerExc
 
 class ServerApiEndpointRedirectException(AiopogoError):
     """Raised when the API redirects you to another endpoint"""
-    def __init__(self):
-        self._api_endpoint = None
+    def __init__(self, endpoint):
+        self.endpoint = endpoint
 
-    def get_redirected_endpoint(self):
-        return self._api_endpoint
-
-    def set_redirected_endpoint(self, api_endpoint):
-        self._api_endpoint = api_endpoint

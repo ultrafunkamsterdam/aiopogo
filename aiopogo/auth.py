@@ -30,11 +30,11 @@ class Auth:
         return self._ticket_expire and self._ticket_start and self._ticket_end
 
     def set_ticket(self, auth_ticket):
-        timestamp = auth_ticket['expire_timestamp_ms']
+        timestamp = auth_ticket.expire_timestamp_ms
         if timestamp > self._ticket_expire:
             self._ticket_expire = timestamp
-            self._ticket_start = auth_ticket['start']
-            self._ticket_end = auth_ticket['end']
+            self._ticket_start = auth_ticket.start
+            self._ticket_end = auth_ticket.end
 
     def is_new_ticket(self, new_ticket_time_ms):
         return new_ticket_time_ms > self._ticket_expire
