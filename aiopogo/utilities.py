@@ -3,8 +3,8 @@ from json import JSONEncoder
 from struct import pack, unpack
 
 
-def f2i(f):
-    return unpack('<q', pack('<d', f))[0]
+def f2i(float_val):
+    return unpack('<q', pack('<d', float_val))[0]
 
 
 def to_camel_case(string):

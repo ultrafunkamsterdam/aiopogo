@@ -7,9 +7,10 @@ from gpsoauth import perform_master_login, perform_oauth
 from .auth import Auth
 from .exceptions import AuthException, InvalidCredentialsException
 
+
 class AuthGoogle(Auth):
     GOOGLE_LOGIN_ANDROID_ID = '9774d56d682e549c'
-    GOOGLE_LOGIN_SERVICE= 'audience:server:client_id:848232511240-7so421jotr2609rmqakceuu1luuq0ptb.apps.googleusercontent.com'
+    GOOGLE_LOGIN_SERVICE = 'audience:server:client_id:848232511240-7so421jotr2609rmqakceuu1luuq0ptb.apps.googleusercontent.com'
     GOOGLE_LOGIN_APP = 'com.nianticlabs.pokemongo'
     GOOGLE_LOGIN_CLIENT_SIG = '321187995bc7cdc2b5fc91b11a96e2baa8602c62'
 
@@ -21,16 +22,24 @@ class AuthGoogle(Auth):
         self._proxy = proxy
 
     async def user_login(self, username, password):
-        self.log.info('Google User Login for: {}'.format(username))
+        self.log.info('Google User Login for: %s', username)
 
         try:
-            assert isinstance(self._username, str) and isinstance(self._password, str)
+            assert (isinstance(username, str)
+                    and isinstance(password, str))
         except AssertionError:
-            raise InvalidCredentialsException("Username/password not correctly specified")
+            raise InvalidCredentialsException(
+                "Username/password not correctly specified")
 
-        login = partial(perform_master_login, username, password, self.GOOGLE_LOGIN_ANDROID_ID, proxy=self._proxy)
-        with ThreadPoolExecutor(max_workers=1) as x:
-            user_login = await self.loop.run_in_executor(x, login)
+        login = partial(
+            perform_master_login,
+            username,
+            password,
+            self.GOOGLE_LOGIN_ANDROID_ID,
+            proxy=self._proxy)
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            user_login = await self.loop.run_in_executor(executor, login)
 
         try:
             self._refresh_token = user_login['Token']
@@ -43,30 +52,31 @@ class AuthGoogle(Auth):
         if not force_refresh and self.check_access_token():
             self.log.debug('Using cached Google access token')
             return self._access_token
-        else:
+
+        self._access_token = None
+        self.authenticated = False
+        self.log.info('Requesting Google access token...')
+
+        oauth = partial(perform_oauth, None, self._refresh_token,
+                        self.GOOGLE_LOGIN_ANDROID_ID, self.GOOGLE_LOGIN_SERVICE,
+                        self.GOOGLE_LOGIN_APP, self.GOOGLE_LOGIN_CLIENT_SIG,
+                        proxy=self._proxy)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            token_data = await self.loop.run_in_executor(executor, oauth)
+
+        try:
+            self._access_token = token_data['Auth']
+        except KeyError:
             self._access_token = None
             self.authenticated = False
-            self.log.info('Requesting Google access token...')
+            raise AuthException("Could not receive a Google Access Token")
 
-            oauth = partial(perform_oauth, None, self._refresh_token,
-                self.GOOGLE_LOGIN_ANDROID_ID, self.GOOGLE_LOGIN_SERVICE,
-                self.GOOGLE_LOGIN_APP, self.GOOGLE_LOGIN_CLIENT_SIG,
-                proxy=self._proxy)
-            with ThreadPoolExecutor(max_workers=1) as x:
-                token_data = await self.loop.run_in_executor(x, oauth)
-
-            try:
-                self._access_token = token_data['Auth']
-            except KeyError:
-                self._access_token = None
-                self.authenticated = False
-                raise AuthException("Could not receive a Google Access Token")
-
-            try:
-                self._access_token_expiry = token_data['Expiry']
-            except KeyError:
-                self._access_token_expiry = time() + 7200.0
-            self.authenticated = True
-            self.log.info('Google Access Token successfully received.')
-            self.log.debug('Google Access Token: %s...', self._access_token[:25])
-            return self._access_token
+        try:
+            self._access_token_expiry = token_data['Expiry']
+        except KeyError:
+            self._access_token_expiry = time() + 7200.0
+        self.authenticated = True
+        self.log.info('Google Access Token successfully received.')
+        self.log.debug('Google Access Token: %s...',
+                       self._access_token[:25])
+        return self._access_token

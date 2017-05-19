@@ -13,7 +13,8 @@ except ImportError:
     raise PleaseInstallProtobufVersion3('Protobuf not found, install it.')
 
 if int(protobuf_version[:1]) < 3:
-    raise PleaseInstallProtobufVersion3('Protobuf 3 needed, you have {}'.format(protobuf_version))
+    raise PleaseInstallProtobufVersion3(
+        'Protobuf 3 needed, you have {}'.format(protobuf_version))
 
 from os import path
 import sys
@@ -34,9 +35,11 @@ from .pgoapi import PGoApi
 from .rpc_api import RpcApi
 from .hash_server import HashServer
 
+
 def close_sessions():
     SESSIONS.close()
     HashServer.close_session()
+
 
 def activate_hash_server(hash_token, conn_limit=300):
     HashServer.set_token(hash_token)

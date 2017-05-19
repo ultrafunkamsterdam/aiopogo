@@ -36,26 +36,37 @@ class RpcApi:
             async with _sessions.get(proxy).post(endpoint, data=proto.SerializeToString(), proxy=proxy, proxy_auth=proxy_auth) as resp:
                 return await resp.read()
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
-            raise ProxyException('Proxy connection error during RPC request.') from e
+            raise ProxyException(
+                'Proxy connection error during RPC request.') from e
         except ClientResponseError as e:
             if e.code == 400:
-                raise BadRequestException("400: Bad RPC request. {}".format(e.message))
+                raise BadRequestException(
+                    "400: Bad RPC request. {}".format(
+                        e.message))
             elif e.code == 403:
-                raise NianticIPBannedException("Seems your IP Address is banned or something else went badly wrong.")
+                raise NianticIPBannedException(
+                    "Seems your IP Address is banned or something else went badly wrong.")
             elif e.code >= 500:
-                raise NianticOfflineException('{} Niantic server error: {}'.format(e.code, e.message))
+                raise NianticOfflineException(
+                    '{} Niantic server error: {}'.format(
+                        e.code, e.message))
             else:
-                raise UnexpectedResponseException('Unexpected RPC response: {}, {}'.format(e.code, e.message))
+                raise UnexpectedResponseException(
+                    'Unexpected RPC response: {}, {}'.format(
+                        e.code, e.message))
         except (TimeoutError, ServerTimeoutError) as e:
             raise NianticTimeoutException('RPC request timed out.') from e
         except ClientError as e:
-            raise NianticOfflineException('{} during RPC. {}'.format(e.__class__.__name__, e)) from e
+            raise NianticOfflineException(
+                '{} during RPC. {}'.format(
+                    e.__class__.__name__, e)) from e
 
     @staticmethod
     def get_request_name(subrequests):
         try:
             first = subrequests[0]
-            return to_camel_case(RequestType.Name(first[0] if isinstance(first, tuple) else first))
+            return to_camel_case(RequestType.Name(
+                first[0] if isinstance(first, tuple) else first))
         except IndexError:
             return 'empty'
         except (ValueError, TypeError):
@@ -88,11 +99,13 @@ class RpcApi:
         request = self._build_sub_requests(request, subrequests)
 
         if self._auth_provider.check_ticket():
-            self.log.debug('Found Session Ticket - using this instead of oauth token')
+            self.log.debug(
+                'Found Session Ticket - using this instead of oauth token')
             request.auth_ticket.expire_timestamp_ms, request.auth_ticket.start, request.auth_ticket.end = self._auth_provider.get_ticket()
             ticket_serialized = request.auth_ticket.SerializeToString()
         else:
-            self.log.debug('No Session Ticket found - using OAUTH Access Token')
+            self.log.debug(
+                'No Session Ticket found - using OAUTH Access Token')
             request.auth_info.provider = self._auth_provider.provider
             request.auth_info.token.contents = await self._auth_provider.get_access_token()
 
@@ -100,7 +113,8 @@ class RpcApi:
             request.auth_info.token.unknown2 = choose_weighted(
                 (4, 19, 22, 26, 30, 44, 45, 50, 57, 58, 59),
                 (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20))
-            ticket_serialized = request.auth_info.SerializeToString()  # Sig uses this when no auth_ticket available
+            # Sig uses this when no auth_ticket available
+            ticket_serialized = request.auth_info.SerializeToString()
 
         sig = SignalLog()
 
@@ -111,7 +125,15 @@ class RpcApi:
         sig.timestamp_ms_since_start = sig.epoch_timestamp_ms - self.state.start_time
 
         hash_engine = HashServer()
-        hashing = HashServer.loop.create_task(hash_engine.hash(sig.epoch_timestamp_ms, request.latitude, request.longitude, request.accuracy, ticket_serialized, sig.field22, request.requests))
+        hashing = HashServer.loop.create_task(
+            hash_engine.hash(
+                sig.epoch_timestamp_ms,
+                request.latitude,
+                request.longitude,
+                request.accuracy,
+                ticket_serialized,
+                sig.field22,
+                request.requests))
 
         loc = sig.location_updates.add()
         sen = sig.sensor_updates.add()
@@ -136,7 +158,8 @@ class RpcApi:
         loc.provider_status = 3
         loc.location_type = 1
         if isinstance(request.accuracy, float):
-            loc.horizontal_accuracy = choose_weighted((request.accuracy, 65, 200), (50, 90, 100))
+            loc.horizontal_accuracy = choose_weighted(
+                (request.accuracy, 65, 200), (50, 90, 100))
             loc.vertical_accuracy = choose_weighted(
                 (-1, 10, 12, 16, 24, 32, 48, 96),
                 (50, 84, 89, 92, 96, 98, 99, 100))
@@ -211,7 +234,8 @@ class RpcApi:
         sig.location_hash, sig.location_hash_by_token_seed, rh = await hashing
         sig.request_hashes.extend(rh)
         sig_request = SendEncryptedSignatureRequest()
-        sig_request.encrypted_signature = pycrypt(sig.SerializeToString(), sig.timestamp_ms_since_start)
+        sig_request.encrypted_signature = pycrypt(
+            sig.SerializeToString(), sig.timestamp_ms_since_start)
 
         plat = request.platform_requests.add()
         plat.type = 6
@@ -237,18 +261,24 @@ class RpcApi:
                 try:
                     class_ = globals()[proto_name]
                 except KeyError:
-                    globals()[proto_name] = class_ = getattr(import_module('pogoprotos.networking.requests.messages.' + proto_name + '_pb2'), to_camel_case(proto_name))
+                    globals()[proto_name] = class_ = getattr(
+                        import_module(
+                            'pogoprotos.networking.requests.messages.' +
+                            proto_name +
+                            '_pb2'),
+                        to_camel_case(proto_name))
 
                 message = class_()
 
                 for key, value in entry_content.items():
                     if isinstance(value, (list, tuple, array)):
-                        self.log.debug("Found sequence: %s - trying as repeated", key)
+                        self.log.debug(
+                            "Found sequence: %s - trying as repeated", key)
                         try:
                             r = getattr(message, key)
                             r.extend(value)
                         except (AttributeError, ValueError) as e:
-                            self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, i, proto_name, e)
+                            self.log.warning('Unknown argument %s inside %s (Exception: %s)', key, proto_name, e)
                     elif isinstance(value, dict):
                         r = getattr(message, key)
                         for k, v in value.items():
@@ -280,9 +310,12 @@ class RpcApi:
         try:
             response_proto.ParseFromString(response_raw)
         except DecodeError as e:
-            raise MalformedNianticResponseException('Could not parse response.') from e
+            raise MalformedNianticResponseException(
+                'Could not parse response.') from e
 
-        self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)
+        self.log.debug(
+            'Protobuf structure of rpc response:\n\r%s',
+            response_proto)
 
         if response_proto.HasField('auth_ticket'):
             self._auth_provider.set_ticket(response_proto.auth_ticket)
@@ -310,7 +343,8 @@ class RpcApi:
             try:
                 err = StatusCode(status_code).name
             except ValueError:
-                raise UnexpectedResponseException("Unknown status_code: {}".format(status_code))
+                raise UnexpectedResponseException(
+                    "Unknown status_code: {}".format(status_code))
             req_type = self.get_request_name(subrequests)
             raise InvalidRPCException("{} on {}.".format(err, req_type))
 
@@ -321,13 +355,20 @@ class RpcApi:
         for i, subresponse in enumerate(response_proto.returns):
             request_entry = subrequests_list[i]
 
-            entry_name = RequestType.Name(request_entry if isinstance(request_entry, int) else request_entry[0])
+            entry_name = RequestType.Name(
+                request_entry if isinstance(
+                    request_entry, int) else request_entry[0])
             proto_name = entry_name.lower() + '_response'
 
             try:
                 class_ = globals()[proto_name]
             except KeyError:
-                globals()[proto_name] = class_ = getattr(import_module('pogoprotos.networking.responses.' + proto_name + '_pb2'), to_camel_case(proto_name))
+                globals()[proto_name] = class_ = getattr(
+                    import_module(
+                        'pogoprotos.networking.responses.' +
+                        proto_name +
+                        '_pb2'),
+                    to_camel_case(proto_name))
 
             message = class_()
             message.ParseFromString(subresponse)

@@ -7,7 +7,8 @@ try:
 except ImportError:
     class Socks4Auth(Exception):
         def __init__(*args, **kwargs):
-            raise ImportError('You must install aiosocks to use a SOCKS proxy.')
+            raise ImportError(
+                'You must install aiosocks to use a SOCKS proxy.')
     Socks5Auth = Socks4Auth
 
 from . import __title__, __version__
@@ -23,7 +24,7 @@ class PGoApi:
     log = getLogger(__name__)
     log.info('%s v%s', __title__, __version__)
 
-    def __init__(self, provider=None, lat=None, lon=None, alt=None, proxy=None, device_info=None):
+    def __init__(self, lat=None, lon=None, alt=None, proxy=None, device_info=None):
         self.auth_provider = None
         self.state = RpcState()
 
@@ -39,13 +40,20 @@ class PGoApi:
 
     async def set_authentication(self, provider='ptc', username=None, password=None, timeout=10, locale='en_US', refresh_token=None):
         if provider == 'ptc':
-            self.auth_provider = AuthPtc(username, password, proxy=self._proxy, proxy_auth=self.proxy_auth, timeout=timeout)
+            self.auth_provider = AuthPtc(
+                username,
+                password,
+                proxy=self._proxy,
+                proxy_auth=self.proxy_auth,
+                timeout=timeout)
         elif provider == 'google':
-            self.auth_provider = AuthGoogle(proxy=proxy, refresh_token=refresh_token)
+            self.auth_provider = AuthGoogle(
+                proxy=self._proxy, refresh_token=refresh_token)
             if refresh_token:
                 return await self.auth_provider.get_access_token()
         else:
-            raise InvalidCredentialsException("Invalid authentication provider - only ptc/google available.")
+            raise InvalidCredentialsException(
+                "Invalid authentication provider - only ptc/google available.")
 
         await self.auth_provider.user_login(username, password)
 
@@ -58,7 +66,8 @@ class PGoApi:
     def create_request(self):
         return PGoApiRequest(self)
 
-    def activate_hash_server(self, hash_token, conn_limit=300):
+    @staticmethod
+    def activate_hash_server(hash_token, conn_limit=300):
         HashServer.set_token(hash_token)
         HashServer.activate_session(conn_limit)
 
@@ -90,13 +99,16 @@ class PGoApi:
             if self._proxy.user:
                 scheme = self._proxy.scheme
                 if scheme == 'http':
-                    self.proxy_auth = BasicAuth(self._proxy.user, self._proxy.password)
+                    self.proxy_auth = BasicAuth(
+                        self._proxy.user, self._proxy.password)
                 elif scheme == 'socks5':
-                    self.proxy_auth = Socks5Auth(self._proxy.user, self._proxy.password)
+                    self.proxy_auth = Socks5Auth(
+                        self._proxy.user, self._proxy.password)
                 elif scheme == 'socks4':
                     self.proxy_auth = Socks4Auth(self._proxy.user)
                 else:
-                    raise ValueError('Proxy protocol must be http, socks5, or socks4.')
+                    raise ValueError(
+                        'Proxy protocol must be http, socks5, or socks4.')
 
     @property
     def start_time(self):
@@ -153,12 +165,14 @@ class PGoApiRequest:
 
     def __getattr__(self, func):
         func = func.upper()
+
         def function(**kwargs):
             self.log.debug('Creating a new request...')
 
             try:
                 if kwargs:
-                    self._req_method_list.append((RequestType.Value(func), kwargs))
+                    self._req_method_list.append(
+                        (RequestType.Value(func), kwargs))
                     self.log.debug("Arguments of '%s': \n\r%s", func, kwargs)
                 else:
                     self._req_method_list.append(RequestType.Value(func))

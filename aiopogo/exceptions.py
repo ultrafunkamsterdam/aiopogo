@@ -56,9 +56,6 @@ class ExpiredHashKeyException(HashServerException):
 class InvalidCredentialsException(AiopogoError, ValueError):
     """Raised when the username, password, or provider are empty/invalid"""
 
-class InvalidCredentialsException(AiopogoError, ValueError):
-    """Raised when the username, password, or provider are empty/invalid"""
-
 
 class MalformedResponseException(AiopogoError):
     """Raised when the response is empty or not in an expected format"""
@@ -134,6 +131,6 @@ class UnexpectedHashResponseException(UnexpectedResponseException, HashServerExc
 
 class ServerApiEndpointRedirectException(AiopogoError):
     """Raised when the API redirects you to another endpoint"""
+
     def __init__(self, endpoint):
         self.endpoint = endpoint
-

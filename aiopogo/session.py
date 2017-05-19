@@ -1,17 +1,23 @@
-from aiohttp import ClientSession, ClientRequest, TCPConnector
 from asyncio import get_event_loop
+
+from aiohttp import ClientSession, ClientRequest, TCPConnector
 
 try:
     from aiosocks.connector import ProxyClientRequest, ProxyConnector
 except ImportError:
     class ProxyConnector:
-        def __init__(s, *args, **kwargs):
+        def __init__(self, *args, **kwargs):
             raise ImportError('Install aiosocks to use socks proxies.')
     ProxyClientRequest = ProxyConnector
 
 
 class SessionManager:
-    __slots__ = ('loop', 'session', 'connector', 'socks_session', 'socks_connector')
+    __slots__ = (
+        'loop',
+        'session',
+        'connector',
+        'socks_session',
+        'socks_connector')
 
     def __init__(self):
         self.loop = get_event_loop()
@@ -46,11 +52,11 @@ class SessionManager:
                                                       verify_ssl=False,
                                                       remote_resolve=False)
                 return self.socks_connector
-            else:
-                self.connector = TCPConnector(limit=limit,
-                                              loop=self.loop,
-                                              verify_ssl=False)
-                return self.connector
+
+            self.connector = TCPConnector(limit=limit,
+                                          loop=self.loop,
+                                          verify_ssl=False)
+            return self.connector
 
     def close(self):
         try:
@@ -61,5 +67,6 @@ class SessionManager:
             self.socks_session.close()
         except AttributeError:
             pass
+
 
 SESSIONS = SessionManager()

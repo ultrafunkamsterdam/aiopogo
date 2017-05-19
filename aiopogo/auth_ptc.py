@@ -9,8 +9,10 @@ from .session import SESSIONS, ProxyClientRequest
 from .auth import Auth
 from .exceptions import ActivationRequiredException, AuthConnectionException, AuthException, AuthTimeoutException, InvalidCredentialsException, ProxyException, SocksError, UnexpectedAuthError
 
+
 class AuthPtc(Auth):
-    def __init__(self, username=None, password=None, proxy=None, proxy_auth=None, timeout=None, locale=None):
+    def __init__(self, username=None, password=None, proxy=None,
+                 proxy_auth=None, timeout=None, locale=None):
         Auth.__init__(self)
         self.provider = 'ptc'
 
@@ -28,17 +30,20 @@ class AuthPtc(Auth):
         self._password = password or self._password
 
         try:
-            assert isinstance(self._username, str) and isinstance(self._password, str)
+            assert (isinstance(self._username, str)
+                    and isinstance(self._password, str))
         except AssertionError as e:
-            raise InvalidCredentialsException("Username/password not correctly specified") from e
-        self.log.info('PTC User Login for: {}'.format(self._username))
+            raise InvalidCredentialsException(
+                "Username/password not correctly specified") from e
+        self.log.info('PTC User Login for: %s', self._username)
 
         try:
             now = time()
             async with ClientSession(
                     connector=SESSIONS.get_connector(self.socks),
                     loop=self.loop,
-                    headers=(('User-Agent', 'niantic'), ('Host', 'sso.pokemon.com')),
+                    headers=(('User-Agent', 'niantic'),
+                             ('Host', 'sso.pokemon.com')),
                     skip_auto_headers=('Accept', 'Accept-Encoding'),
                     request_class=ProxyClientRequest if self.socks else ClientRequest,
                     connector_owner=False,
@@ -74,11 +79,13 @@ class AuthPtc(Auth):
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException('Proxy connection error during user_login.') from e
         except ClientResponseError as e:
-            raise AuthConnectionException('Error {} during user_login: {}'.format(e.code, e.message))
+            raise AuthConnectionException('Error {} during user_login: {}'.format(
+                e.code, e.message))
         except (TimeoutError, ServerTimeoutError) as e:
             raise AuthTimeoutException('user_login timeout.') from e
         except ClientError as e:
-            raise AuthConnectionException('{} during user_login.'.format(e.__class__.__name__)) from e
+            raise AuthConnectionException('{} during user_login.'.format(
+                e.__class__.__name__)) from e
         except (AssertionError, TypeError, ValueError) as e:
             raise AuthException('Invalid initial JSON response.') from e
 
@@ -91,8 +98,8 @@ class AuthPtc(Auth):
         if not force_refresh and self.check_access_token():
             self.log.debug('Using cached PTC Access Token')
             return self._access_token
-        else:
-            self._access_token = None
-            self.authenticated = False
-            await self.user_login()
-            return self._access_token
+
+        self._access_token = None
+        self.authenticated = False
+        await self.user_login()
+        return self._access_token

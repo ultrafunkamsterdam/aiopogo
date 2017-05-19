@@ -4,6 +4,7 @@ from asyncio import get_event_loop
 
 from .utilities import get_time_ms
 
+
 class Auth:
     loop = get_event_loop()
 
@@ -42,10 +43,10 @@ class Auth:
     def check_ticket(self):
         if get_time_ms() < (self._ticket_expire - 10000):
             return True
-        else:
-            self.log.debug('Removed expired Session Ticket (%s)', self._ticket_expire)
-            self._ticket_expire, self._ticket_start, self._ticket_end = 0, None, None
-            return False
+        self.log.debug(
+            'Removed expired Session Ticket (%s)', self._ticket_expire)
+        self._ticket_expire, self._ticket_start, self._ticket_end = 0, None, None
+        return False
 
     def get_ticket(self):
         return self._ticket_expire, self._ticket_start, self._ticket_end

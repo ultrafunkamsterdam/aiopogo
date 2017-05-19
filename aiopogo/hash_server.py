@@ -4,13 +4,12 @@ from asyncio import get_event_loop, TimeoutError, CancelledError, sleep
 from itertools import cycle
 from time import time
 from logging import getLogger
-from struct import pack, unpack
 
 from aiohttp import ClientSession, ClientError, ClientResponseError, ServerConnectionError, ServerTimeoutError
 
 from . import json_dumps, json_loads
-from .exceptions import BadHashRequestException, ExpiredHashKeyException, HashingOfflineException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, TimeoutException, UnexpectedHashResponseException
 from .connector import TimedConnector
+from .exceptions import BadHashRequestException, ExpiredHashKeyException, HashingOfflineException, HashingTimeoutException, MalformedHashResponseException, NoHashKeyException, TempHashingBanException, UnexpectedHashResponseException
 from .utilities import f2i
 
 
@@ -25,7 +24,8 @@ class HashServer:
         try:
             self.instance_token = self.auth_token
         except AttributeError:
-            NoHashKeyException('You must provide a hash key before making a request.')
+            NoHashKeyException(
+                'You must provide a hash key before making a request.')
 
     async def hash(self, timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests):
         status = self.key_status
@@ -58,12 +58,14 @@ class HashServer:
         for attempt in range(2):
             try:
                 async with self._session.post("http://pokehash.buddyauth.com/api/v133_1/hash", headers=headers, json=payload) as resp:
-                    if 400 <= resp.status:
+                    if resp.status >= 400:
                         if resp.status == 400:
                             response = await resp.text()
                             if response == 'Unauthorized':
                                 if self.multi:
-                                    self.log.warning('{:.10}... expired, removing from rotation.'.format(self.instance_token))
+                                    self.log.warning(
+                                        '{:.10}... expired, removing from rotation.'.format(
+                                            self.instance_token))
                                     self.remove_token(self.instance_token)
                                     self.instance_token = self.auth_token
                                     if attempt < 1:
@@ -85,7 +87,9 @@ class HashServer:
                     self.instance_token = self.auth_token
                     return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
                 elif e.code >= 500 or e.code == 404:
-                    raise HashingOfflineException('Hashing server error {}: {}'.format(e.code, e.message))
+                    raise HashingOfflineException(
+                        'Hashing server error {}: {}'.format(
+                            e.code, e.message))
                 else:
                     raise UnexpectedHashResponseException('Unexpected hash code {}: {}'.format(e.code, e.message))
             except ValueError as e:
