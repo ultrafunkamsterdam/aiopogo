@@ -16,7 +16,7 @@ from .auth_ptc import AuthPtc
 from .auth_google import AuthGoogle
 from .hash_server import HashServer
 from .exceptions import AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, ServerApiEndpointRedirectException
-from .protos.pogoprotos.networking.requests.request_type_pb2 import RequestType
+from .pogoprotos.networking.requests.request_type_pb2 import RequestType
 
 
 class PGoApi:

@@ -1,29 +1,27 @@
-from importlib import import_module
-from asyncio import TimeoutError
 from array import array
-from os import urandom
-from logging import getLogger
-from struct import Struct
+from asyncio import TimeoutError
 from enum import Enum
+from importlib import import_module
+from logging import getLogger
+from os import urandom
 
-from google.protobuf import message
 from aiohttp import ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
-from pycrypt import pycrypt
 from cyrandom import choose_weighted, randint, random, triangular, triangular_int, uniform
+from google.protobuf.message import DecodeError
+from pycrypt import pycrypt
 
 from .exceptions import *
-from .utilities import to_camel_case, get_time_ms, IdGenerator
 from .hash_server import HashServer
 from .session import SESSIONS
+from .utilities import to_camel_case, get_time_ms, IdGenerator
 
-from .protos.pogoprotos import networking
-from networking.envelopes.request_envelope_pb2 import RequestEnvelope
-from networking.envelopes.response_envelope_pb2 import ResponseEnvelope
-from networking.envelopes.signal_log_pb2 import SignalLog
-from networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
-from networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
-from networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
-from networking.requests.request_type_pb2 import RequestType
+from .pogoprotos.networking.envelopes.request_envelope_pb2 import RequestEnvelope
+from .pogoprotos.networking.envelopes.response_envelope_pb2 import ResponseEnvelope
+from .pogoprotos.networking.envelopes.signal_log_pb2 import SignalLog
+from .pogoprotos.networking.platform.requests.send_encrypted_signature_request_pb2 import SendEncryptedSignatureRequest
+from .pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
+from .pogoprotos.networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
+from .pogoprotos.networking.requests.request_type_pb2 import RequestType
 
 
 class RpcApi:
@@ -281,7 +279,7 @@ class RpcApi:
         response_proto = ResponseEnvelope()
         try:
             response_proto.ParseFromString(response_raw)
-        except message.DecodeError as e:
+        except DecodeError as e:
             raise MalformedNianticResponseException('Could not parse response.') from e
 
         self.log.debug('Protobuf structure of rpc response:\n\r%s', response_proto)

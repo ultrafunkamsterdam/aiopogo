@@ -15,6 +15,10 @@ except ImportError:
 if int(protobuf_version[:1]) < 3:
     raise PleaseInstallProtobufVersion3('Protobuf 3 needed, you have {}'.format(protobuf_version))
 
+from os import path
+import sys
+sys.path.append(path.dirname(path.realpath(__file__)))
+
 from functools import partial as _partial
 
 try:
