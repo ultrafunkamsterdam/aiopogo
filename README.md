@@ -23,9 +23,13 @@ Documentation is available at the [pgoapi wiki](https://wiki.pogodev.org).
  * Python ≥3.5
  * aiohttp
  * protobuf (≥3)
- * gpsoauth
  * pycrypt
  * cyrandom
+
+##### Optional Packages
+ * *gpsoauth*: required for Google accounts
+ * *aiosocks*: required for SOCKS proxies
+ * *ujson*, *cchardet*, *aiodns*: improve performance
 
 ## Contribution
 Contributions are very welcome, feel free to submit a pull request.

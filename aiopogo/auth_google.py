@@ -2,7 +2,12 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from time import time
 
-from gpsoauth import perform_master_login, perform_oauth
+try:
+    from gpsoauth import perform_master_login, perform_oauth
+except ImportError:
+    def perform_master_login(*args, **kwargs):
+        raise ImportError('Must install gpsoauth to use Google accounts')
+    perform_oauth = perform_master_login
 
 from .auth import Auth
 from .exceptions import AuthException, InvalidCredentialsException
