@@ -23,8 +23,9 @@ Documentation is available at the [pgoapi wiki](https://wiki.pogodev.org).
  * Python ≥3.5
  * aiohttp
  * protobuf (≥3)
- * pycrypt
- * cyrandom
+ * [pycrypt](https://github.com/Noctem/pycrypt)
+ * [cyrandom](https://github.com/Noctem/cyrandom)
+ * [pogeo](https://github.com/Noctem/pogeo)
 
 ##### Optional Packages
  * *gpsoauth*: required for Google accounts

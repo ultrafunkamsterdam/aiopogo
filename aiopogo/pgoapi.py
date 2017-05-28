@@ -1,7 +1,8 @@
 from logging import getLogger
 
-from yarl import URL
 from aiohttp import BasicAuth
+from pogeo import Location
+from yarl import URL
 try:
     from aiosocks import Socks4Auth, Socks5Auth
 except ImportError:
@@ -24,15 +25,11 @@ class PGoApi:
     log = getLogger(__name__)
     log.info('%s v%s', __title__, __version__)
 
-    def __init__(self, lat=None, lon=None, alt=None, proxy=None, device_info=None):
+    def __init__(self, proxy=None, device_info=None):
         self.auth_provider = None
         self.state = RpcState()
 
         self._api_endpoint = 'https://pgorelease.nianticlabs.com/plfe/rpc'
-
-        self.latitude = lat
-        self.longitude = lon
-        self.altitude = alt
 
         self.proxy_auth = None
         self.proxy = proxy
@@ -57,23 +54,13 @@ class PGoApi:
 
         await self.auth_provider.user_login(username, password)
 
-    def set_position(self, lat, lon, alt=None):
-        self.log.debug('Set Position - Lat: %s Lon: %s Alt: %s', lat, lon, alt)
-        self.latitude = lat
-        self.longitude = lon
-        self.altitude = alt
+    def set_position(self, lat, lon, alt=0.0):
+        """Deprecated position setter, setting directly is recommended"""
+        self.position = Location(lat, lon)
+        self.position[2] = alt
 
     def create_request(self):
         return PGoApiRequest(self)
-
-    @staticmethod
-    def activate_hash_server(hash_token, conn_limit=300):
-        HashServer.set_token(hash_token)
-        HashServer.activate_session(conn_limit)
-
-    @property
-    def position(self):
-        return self.latitude, self.longitude, self.altitude
 
     @property
     def api_endpoint(self):
@@ -81,10 +68,9 @@ class PGoApi:
 
     @api_endpoint.setter
     def api_endpoint(self, api_url):
-        if api_url.startswith("https"):
-            self._api_endpoint = URL(api_url)
-        else:
-            self._api_endpoint = URL('https://' + api_url + '/rpc')
+        self._api_endpoint = (URL(api_url)
+            if api_url.startswith("https")
+            else URL('https://' + api_url + '/rpc'))
 
     @property
     def proxy(self):
@@ -136,10 +122,9 @@ class PGoApiRequest:
     async def call(self):
         parent = self.__parent__
         auth_provider = parent.auth_provider
-        position = parent.position
         try:
-            assert position[0] is not None and position[1] is not None
-        except AssertionError:
+            position = parent.position
+        except AttributeError:
             raise NoPlayerPositionSetException('No position set.')
 
         request = RpcApi(auth_provider, parent.state)

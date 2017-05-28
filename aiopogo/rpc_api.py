@@ -145,7 +145,7 @@ class RpcApi:
         loc.latitude = request.latitude
         loc.longitude = request.longitude
 
-        loc.altitude = altitude or uniform(150, 250)
+        loc.altitude = altitude or uniform(390.0, 490.0)
 
         if random() > .85:
             # no reading for roughly 1 in 7 updates
