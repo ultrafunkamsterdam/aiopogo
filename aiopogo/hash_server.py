@@ -58,23 +58,22 @@ class HashServer:
         for attempt in range(2):
             try:
                 async with self._session.post("http://pokehash.buddyauth.com/api/v133_1/hash", headers=headers, json=payload) as resp:
-                    if resp.status >= 400:
-                        if resp.status == 400:
-                            response = await resp.text()
-                            if response == 'Unauthorized':
-                                if self.multi:
-                                    self.log.warning(
-                                        '{:.10}... expired, removing from rotation.'.format(
-                                            self.instance_token))
-                                    self.remove_token(self.instance_token)
-                                    self.instance_token = self.auth_token
-                                    if attempt < 1:
-                                        headers = {'X-AuthToken': self.instance_token}
-                                        continue
-                                    return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
-                                raise ExpiredHashKeyException("{:.10}... appears to have expired.".format(self.instance_token))
-                            raise BadHashRequestException('400 was returned from the hashing server with the message: {}'.format(response))
-                        raise ClientResponseError(code=resp.status, message=resp.reason)
+                    if resp.status == 400:
+                        response = await resp.text()
+                        if response == 'Unauthorized':
+                            if self.multi:
+                                self.log.warning(
+                                    '{:.10}... expired, removing from rotation.'.format(
+                                        self.instance_token))
+                                self.remove_token(self.instance_token)
+                                self.instance_token = self.auth_token
+                                if attempt < 1:
+                                    headers = {'X-AuthToken': self.instance_token}
+                                    continue
+                                return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+                            raise ExpiredHashKeyException("{:.10}... appears to have expired.".format(self.instance_token))
+                        raise BadHashRequestException('400 was returned from the hashing server with the message: {}'.format(response))
+                    resp.raise_for_status()
 
                     response = await resp.json(encoding='ascii', loads=json_loads)
                     headers = resp.headers
