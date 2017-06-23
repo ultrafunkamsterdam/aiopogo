@@ -11,12 +11,12 @@ setup(name='aiopogo',
       packages=find_packages(),
       install_requires=[
           'protobuf>=3.0.0',
-          'aiohttp>=2.0.7,<2.2',
+          'aiohttp>=2.1,<2.3',
           'pycrypt>=0.7.0',
           'cyrandom>=0.1.2'],
       extras_require={
           'performance': ['ujson>=1.3.5', 'cchardet>=2.1.0', 'aiodns>=1.1.1'],
-          'socks': ['aiosocks>=0.2.2'],
+          'socks': ['aiosocks>=0.2.3'],
           'google': ['gpsoauth>=0.4.0']},
       license='MIT',
       classifiers=[
