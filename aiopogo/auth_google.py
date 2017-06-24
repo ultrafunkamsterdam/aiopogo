@@ -77,7 +77,7 @@ class AuthGoogle(Auth):
             raise AuthException("Could not receive a Google Access Token")
 
         try:
-            self._access_token_expiry = token_data['Expiry']
+            self._access_token_expiry = float(token_data['Expiry'])
         except KeyError:
             self._access_token_expiry = time() + 7200.0
         self.authenticated = True
