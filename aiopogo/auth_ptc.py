@@ -42,15 +42,16 @@ class AuthPtc(Auth):
             async with ClientSession(
                     connector=SESSIONS.get_connector(self.socks),
                     loop=self.loop,
-                    headers=(('User-Agent', 'niantic'),
-                             ('Host', 'sso.pokemon.com')),
+                    headers=(('User-Agent', 'pokemongo/1 CFNetwork/811.4.18 Darwin/16.5.0'),
+                             ('Host', 'sso.pokemon.com'),
+                             ('X-Unity-Version', '5.5.1f1')),
                     skip_auto_headers=('Accept', 'Accept-Encoding'),
                     request_class=ProxyClientRequest if self.socks else ClientRequest,
                     connector_owner=False,
                     raise_for_status=True,
                     conn_timeout=5.0,
                     read_timeout=self.timeout) as session:
-                async with session.get('https://sso.pokemon.com/sso/oauth2.0/authorize', params={'client_id': 'mobile-app_pokemon-go', 'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error', 'locale': self.locale}, proxy=self.proxy, proxy_auth=self.proxy_auth) as resp:
+                async with session.get('https://sso.pokemon.com/sso/oauth2.0/authorize', headers={'Content-Length': '-1'}, params={'client_id': 'mobile-app_pokemon-go', 'redirect_uri': 'https://www.nianticlabs.com/pokemongo/error', 'locale': self.locale}, proxy=self.proxy, proxy_auth=self.proxy_auth) as resp:
                     data = await resp.json(loads=json_loads, encoding='utf-8', content_type=None)
 
                     assert 'lt' in data
