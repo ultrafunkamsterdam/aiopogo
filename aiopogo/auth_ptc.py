@@ -42,10 +42,11 @@ class AuthPtc(Auth):
             async with ClientSession(
                     connector=SESSIONS.get_connector(self.socks),
                     loop=self.loop,
-                    headers=(('User-Agent', 'pokemongo/1 CFNetwork/811.4.18 Darwin/16.5.0'),
-                             ('Host', 'sso.pokemon.com'),
+                    headers=(('Host', 'sso.pokemon.com'),
+                             ('Connection', 'keep-alive'),
+                             ('User-Agent', 'pokemongo/1 CFNetwork/811.4.18 Darwin/16.5.0'),
+                             ('Accept-Language', self.locale.lower().replace('_', '-')),
                              ('X-Unity-Version', '5.5.1f1')),
-                    skip_auto_headers=('Accept', 'Accept-Encoding'),
                     request_class=ProxyClientRequest if self.socks else ClientRequest,
                     connector_owner=False,
                     raise_for_status=True,
@@ -60,7 +61,7 @@ class AuthPtc(Auth):
                     data['password'] = self._password
                     data['locale'] = self.locale
 
-                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize'}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False) as resp:
+                async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize', 'locale': self.locale}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False) as resp:
                     try:
                         self._access_token = resp.cookies['CASTGC'].value
                     except (AttributeError, KeyError, TypeError):
