@@ -49,8 +49,7 @@ class SessionManager:
             if socks:
                 self.socks_connector = ProxyConnector(limit=limit,
                                                       loop=self.loop,
-                                                      verify_ssl=False,
-                                                      remote_resolve=False)
+                                                      verify_ssl=False)
                 return self.socks_connector
 
             self.connector = TCPConnector(limit=limit,
