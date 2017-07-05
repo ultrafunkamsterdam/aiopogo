@@ -103,7 +103,7 @@ class AuthPtc(Auth):
                         except (AttributeError, IndexError, KeyError, TypeError) as e:
                             raise AuthException('Unable to login or get error information.') from e
 
-                async with session.post('https://sso.pokemon.com/sso/oauth2.0/accessToken', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=token_data, timeout=8.0, proxy='http://127.0.0.1:8888') as resp:
+                async with session.post('https://sso.pokemon.com/sso/oauth2.0/accessToken', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=token_data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth) as resp:
                     profile_data = {}
                     profile_data['access_token'] = self._access_token
                     profile_data['client_id'] = 'mobile-app_pokemon-go'
