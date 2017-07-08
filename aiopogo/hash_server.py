@@ -55,25 +55,32 @@ class HashServer:
         }
 
         # request hashes from hashing server
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 async with self._session.post("http://pokehash.buddyauth.com/api/v137_1/hash", headers=headers, json=payload) as resp:
                     if resp.status == 400:
-                        response = await resp.text()
-                        if response == 'Unauthorized':
-                            if self.multi:
-                                self.log.warning(
-                                    '{:.10}... expired, removing from rotation.'.format(
-                                        self.instance_token))
-                                self.remove_token(self.instance_token)
-                                self.instance_token = self.auth_token
-                                if attempt < 1:
-                                    headers = {'X-AuthToken': self.instance_token}
-                                    continue
-                                return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
-                            raise ExpiredHashKeyException("{:.10}... appears to have expired.".format(self.instance_token))
-                        raise BadHashRequestException('400 was returned from the hashing server with the message: {}'.format(response))
+                        status['failures'] += 1
+
+                        if status['failures'] < 10:
+                            if attempt < 2:
+                                await sleep(1.0)
+                                continue
+                            raise BadHashRequestException('400 was returned from the hashing server.')
+
+                        if self.multi:
+                            self.log.warning(
+                                '{:.10}... expired, removing from rotation.'.format(
+                                    self.instance_token))
+                            self.remove_token(self.instance_token)
+                            self.instance_token = self.auth_token
+                            if attempt < 2:
+                                headers = {'X-AuthToken': self.instance_token}
+                                continue
+                            return await self.hash(timestamp, latitude, longitude, accuracy, authticket, sessiondata, requests)
+                        raise ExpiredHashKeyException("{:.10}... appears to have expired.".format(self.instance_token))
+
                     resp.raise_for_status()
+                    status['failures'] = 0
 
                     response = await resp.json(encoding='ascii', loads=json_loads)
                     headers = resp.headers
@@ -94,14 +101,14 @@ class HashServer:
             except ValueError as e:
                 raise MalformedHashResponseException('Unable to parse JSON from hash server.') from e
             except (TimeoutError, ServerConnectionError, ServerTimeoutError) as e:
-                if attempt < 1:
+                if attempt < 2:
                     self.log.info('Hashing request timed out.')
                     await sleep(1.5)
                 else:
                     raise HashingTimeoutException('Hashing request timed out.') from e
             except ClientError as e:
                 error = '{} during hashing. {}'.format(e.__class__.__name__, e)
-                if attempt < 1:
+                if attempt < 2:
                     self.log.info(error)
                 else:
                     raise HashingOfflineException(error) from e
@@ -174,8 +181,8 @@ class HashServer:
             cls._tokens = cycle(token)
             cls.auth_token = cls._multi_token
             cls.multi = len(token)
-            cls.key_statuses = {t: {} for t in token}
+            cls.key_statuses = {t: {'failures': 0} for t in token}
             cls.key_status = cls._multi_status
         else:
             cls.auth_token = token
-            cls.key_status = {}
+            cls.key_status = {'failures': 0}
