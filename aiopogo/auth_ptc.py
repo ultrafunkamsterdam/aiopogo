@@ -62,9 +62,11 @@ class AuthPtc(Auth):
                     data['username'] = self._username
                     data['password'] = self._password
 
-                await session.get('https://sso.pokemon.com/sso/logout', params={'service': 'https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize'}, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False)
+                async with session.get('https://sso.pokemon.com/sso/logout', params={'service': 'https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize'}, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False) as _:
+                    pass
 
-                await session.get('https://sso.pokemon.com/sso/login', params={'service': 'https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize', 'locale': self.locale}, proxy=self.proxy, proxy_auth=self.proxy_auth)
+                async with session.get('https://sso.pokemon.com/sso/login', params={'service': 'https%3A%2F%2Fsso.pokemon.com%2Fsso%2Foauth2.0%2FcallbackAuthorize', 'locale': self.locale}, proxy=self.proxy, proxy_auth=self.proxy_auth) as _:
+                    pass
 
                 async with session.post('https://sso.pokemon.com/sso/login', params={'service': 'http://sso.pokemon.com/sso/oauth2.0/callbackAuthorize', 'locale': self.locale}, headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth, allow_redirects=False) as resp:
                     try:
@@ -96,9 +98,10 @@ class AuthPtc(Auth):
                         'access_token': self._access_token,
                         'client_id': 'mobile-app_pokemon-go',
                         'locale': self.locale
-		    }
+                    }
 
-                await session.post('https://sso.pokemon.com/sso/oauth2.0/profile', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=profile_data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth)
+                async with session.post('https://sso.pokemon.com/sso/oauth2.0/profile', headers={'Content-Type': 'application/x-www-form-urlencoded'}, data=profile_data, timeout=8.0, proxy=self.proxy, proxy_auth=self.proxy_auth) as _:
+                    pass
 
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException('Proxy connection error during user_login.') from e
