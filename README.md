@@ -35,6 +35,6 @@ Documentation is available at the [pgoapi wiki](https://wiki.pogodev.org).
 Contributions are very welcome, feel free to submit a pull request.
 
 ## Credits
-[AeonLucid](https://github.com/AeonLucid/POGOProtos) for improved protos
-[tejado](https://github.com/tejado/pgoapi) for the original project
-[pogodev](https://github.com/pogodevorg/pgoapi) for keeping it alive
+ * [AeonLucid](https://github.com/AeonLucid/POGOProtos) for improved protos
+ * [tejado](https://github.com/tejado/pgoapi) for the original project
+ * [pogodev](https://github.com/pogodevorg/pgoapi) for keeping it alive
