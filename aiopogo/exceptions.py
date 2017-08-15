@@ -45,10 +45,11 @@ class InvalidRPCException(BadRequestException):
 class BadRPCException(InvalidRPCException):
     """Raised when an invalid RPC is made."""
 
+class WarnAccountException(AiopogoError):
+    """Raised when an account is warn"""
 
 class BannedAccountException(AiopogoError):
     """Raised when an account is banned"""
-
 
 class ExpiredHashKeyException(HashServerException):
     """Raised when a hash key has expired."""
