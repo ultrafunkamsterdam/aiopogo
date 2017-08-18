@@ -26,7 +26,7 @@ class IdGenerator:
     M = 0x7fffffff  # 2^31 - 1 (A large prime number)
     A = 16807       # Prime root of M
 
-    def __init__(self, seed=16807):
+    def __init__(self, seed=1):
         self.seed = seed
         self.request = 1
 
