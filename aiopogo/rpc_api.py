@@ -39,18 +39,18 @@ class RpcApi:
 
     async def _make_rpc(self, endpoint, proto, proxy, proxy_auth, _sessions=SESSIONS):
         try:
-            temps = '{}'.format(datetime.now().strftime("%Y%m%d%H%M%S%f"))
-            location = join('data', '{}.req.bin'.format(temps))
-            payload = {
-                'data': base64.b64encode(proto.SerializeToString()).decode('utf-8'),
-            }
-            with open(location, 'w') as f:
-                json.dump(payload, f)
+            # temps = '{}'.format(datetime.now().strftime("%Y%m%d%H%M%S%f"))
+            # location = join('data', '{}.req.bin'.format(temps))
+            # payload = {
+            #     'data': base64.b64encode(proto.SerializeToString()).decode('utf-8'),
+            # }
+            # with open(location, 'w') as f:
+            #     json.dump(payload, f)
             async with _sessions.get(proxy).post(endpoint, data=proto.SerializeToString(), proxy=proxy, proxy_auth=proxy_auth) as resp:
-                location = join('data', '{}.res.bin'.format(temps))
+                # location = join('data', '{}.res.bin'.format(temps))
                 r = await resp.read()
-                with open(location, 'wb') as f:
-                    f.write(base64.b64encode(r))
+                # with open(location, 'wb') as f:
+                #     f.write(base64.b64encode(r))
                 return r
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException(
