@@ -4,6 +4,10 @@ from enum import Enum
 from importlib import import_module
 from logging import getLogger
 from os import urandom
+from os.path import join
+from datetime import datetime
+import json
+import base64
 
 from aiohttp import ClientError, ClientHttpProxyError, ClientProxyConnectionError, ClientResponseError, ServerTimeoutError
 from cyrandom import choose_weighted, randint, random, triangular, triangular_int, uniform
@@ -22,6 +26,7 @@ from .pogoprotos.networking.platform.requests.send_encrypted_signature_request_p
 from .pogoprotos.networking.platform.requests.plat_eight_request_pb2 import PlatEightRequest
 from .pogoprotos.networking.platform.responses.plat_eight_response_pb2 import PlatEightResponse
 from .pogoprotos.networking.requests.request_type_pb2 import RequestType
+from .pogoprotos.networking.platform.platform_request_type_pb2 import PlatformRequestType
 
 
 class RpcApi:
@@ -30,11 +35,23 @@ class RpcApi:
     def __init__(self, auth_provider, state):
         self._auth_provider = auth_provider
         self.state = state
+        self.request_id = self.state.request_id
 
     async def _make_rpc(self, endpoint, proto, proxy, proxy_auth, _sessions=SESSIONS):
         try:
+            temps = '{}'.format(datetime.now().strftime("%Y%m%d%H%M%S%f"))
+            location = join('data', '{}.req.bin'.format(temps))
+            payload = {
+                'data': base64.b64encode(proto.SerializeToString()).decode('utf-8'),
+            }
+            with open(location, 'w') as f:
+                json.dump(payload, f)
             async with _sessions.get(proxy).post(endpoint, data=proto.SerializeToString(), proxy=proxy, proxy_auth=proxy_auth) as resp:
-                return await resp.read()
+                location = join('data', '{}.res.bin'.format(temps))
+                r = await resp.read()
+                with open(location, 'wb') as f:
+                    f.write(base64.b64encode(r))
+                return r
         except (ClientHttpProxyError, ClientProxyConnectionError, SocksError) as e:
             raise ProxyException(
                 'Proxy connection error during RPC request.') from e
@@ -72,19 +89,19 @@ class RpcApi:
         except (ValueError, TypeError):
             return 'unknown'
 
-    async def request(self, endpoint, subrequests, player_position, device_info=None, proxy=None, proxy_auth=None):
-        request_proto = await self._build_main_request(subrequests, player_position, device_info)
+    async def request(self, endpoint, subrequests, subplatforms, player_position, device_info=None, proxy=None, proxy_auth=None):
+        request_proto = await self._build_main_request(subrequests, subplatforms, player_position, device_info)
 
         response = await self._make_rpc(endpoint, request_proto, proxy, proxy_auth)
-        return self._parse_response(response, subrequests)
+        return self._parse_response(response, subrequests, subplatforms)
 
-    async def _build_main_request(self, subrequests, player_position, device_info=None):
+    async def _build_main_request(self, subrequests, subplatforms, player_position, device_info=None):
         self.log.debug('Generating main RPC request...')
 
         request = RequestEnvelope()
         request.status_code = 2
 
-        request.request_id = self.state.request_id
+        request.request_id = self.request_id
 
         # 5: 43%, 10: 30%, 30: 5%, 50: 4%, 65: 10%, 200: 1%, float: 7%
         request.accuracy = choose_weighted(
@@ -96,7 +113,7 @@ class RpcApi:
         request.latitude, request.longitude, altitude = player_position
 
         # generate sub requests before SignalLog generation
-        request = self._build_sub_requests(request, subrequests)
+        request = self._build_sub_requests(request, subrequests, subplatforms)
 
         if self._auth_provider.check_ticket():
             self.log.debug(
@@ -246,7 +263,7 @@ class RpcApi:
         self.log.debug('Generated protobuf request: \n\r%s', request)
         return request
 
-    def _build_sub_requests(self, mainrequest, subrequest_list):
+    def _build_sub_requests(self, mainrequest, subrequest_list, subplatform_list):
         self.log.debug('Generating sub RPC requests...')
 
         for entry in subrequest_list:
@@ -268,42 +285,67 @@ class RpcApi:
                             '_pb2'),
                         to_camel_case(proto_name))
 
-                message = class_()
-
-                for key, value in entry_content.items():
-                    if isinstance(value, (list, tuple, array)):
-                        self.log.debug(
-                            "Found sequence: %s - trying as repeated", key)
-                        try:
-                            r = getattr(message, key)
-                            r.extend(value)
-                        except (AttributeError, ValueError) as e:
-                            self.log.warning('Unknown argument %s inside %s (Exception: %s)', key, proto_name, e)
-                    elif isinstance(value, dict):
-                        r = getattr(message, key)
-                        for k, v in value.items():
-                            try:
-                                setattr(r, k, v)
-                            except (AttributeError, ValueError) as e:
-                                self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, str(value), proto_name, e)
-                    else:
-                        try:
-                            setattr(message, key, value)
-                        except (AttributeError, ValueError) as e:
-                            self.log.warning('Argument %s with value %s inside %s should be a sequence.', key, value, proto_name)
-                            try:
-                                self.log.debug("%s -> %s", key, value)
-                                getattr(message, key).append(value)
-                            except (AttributeError, ValueError) as e:
-                                self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, value, proto_name, e)
-
+                message = self._create_message(entry_content, class_())
                 subrequest = mainrequest.requests.add()
                 subrequest.request_type = entry_id
                 subrequest.request_message = message.SerializeToString()
 
+        for entry in subplatform_list:
+            if isinstance(entry, int):
+                subplatform = mainrequest.platform_requests.add()
+                subplatform.type = entry
+            else:
+                entry_id, entry_content = entry
+
+                proto_name = PlatformRequestType.Name(entry_id).lower() + '_request'
+
+                try:
+                    class_ = globals()[proto_name]
+                except KeyError:
+                    globals()[proto_name] = class_ = getattr(
+                        import_module(
+                            'pogoprotos.networking.paltform.requests.' +
+                            proto_name +
+                            '_pb2'),
+                        to_camel_case(proto_name))
+
+                message = self._create_message(entry_content, class_())
+                subplatform = mainrequest.requests.add()
+                subplatform.type = entry_id
+                subplatform.request_message = message.SerializeToString()
+
         return mainrequest
 
-    def _parse_response(self, response_raw, subrequests):
+    def _create_message(self, entry_content, message):
+        for key, value in entry_content.items():
+            if isinstance(value, (list, tuple, array)):
+                self.log.debug(
+                    "Found sequence: %s - trying as repeated", key)
+                try:
+                    r = getattr(message, key)
+                    r.extend(value)
+                except (AttributeError, ValueError) as e:
+                    self.log.warning('Unknown argument %s inside %s (Exception: %s)', key, proto_name, e)
+            elif isinstance(value, dict):
+                r = getattr(message, key)
+                for k, v in value.items():
+                    try:
+                        setattr(r, k, v)
+                    except (AttributeError, ValueError) as e:
+                        self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, str(value), proto_name, e)
+            else:
+                try:
+                    setattr(message, key, value)
+                except (AttributeError, ValueError) as e:
+                    self.log.warning('Argument %s with value %s inside %s should be a sequence.', key, value, proto_name)
+                    try:
+                        self.log.debug("%s -> %s", key, value)
+                        getattr(message, key).append(value)
+                    except (AttributeError, ValueError) as e:
+                        self.log.warning('Argument %s with value %s unknown inside %s (Exception: %s)', key, value, proto_name, e)
+        return message
+
+    def _parse_response(self, response_raw, subrequests, subplatforms):
         self.log.debug('Parsing main RPC response...')
 
         response_proto = ResponseEnvelope()
@@ -331,7 +373,7 @@ class RpcApi:
         # some response validations
         status_code = response_proto.status_code
         if status_code in (1, 2):
-            return self._parse_sub_responses(subrequests, response_proto)
+            return self._parse_sub_responses(subrequests, subplatforms, response_proto)
         elif status_code == 53:
             raise ServerApiEndpointRedirectException(response_proto.api_url)
         elif status_code == 102:
@@ -348,7 +390,7 @@ class RpcApi:
             req_type = self.get_request_name(subrequests)
             raise InvalidRPCException("{} on {}.".format(err, req_type))
 
-    def _parse_sub_responses(self, subrequests_list, response_proto):
+    def _parse_sub_responses(self, subrequests_list, subplatforms_list, response_proto):
         self.log.debug('Parsing sub RPC responses...')
         responses = {}
 

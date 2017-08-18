@@ -18,6 +18,7 @@ from .auth_google import AuthGoogle
 from .hash_server import HashServer
 from .exceptions import AuthTokenExpiredException, InvalidCredentialsException, NoPlayerPositionSetException, ServerApiEndpointRedirectException
 from .pogoprotos.networking.requests.request_type_pb2 import RequestType
+from .pogoprotos.networking.platform.platform_request_type_pb2 import PlatformRequestType
 
 
 class PGoApi:
@@ -132,6 +133,7 @@ class PGoApiRequest:
     def __init__(self, parent):
         self.__parent__ = parent
         self._req_method_list = []
+        self._req_platform_list = []
 
     async def call(self):
         parent = self.__parent__
@@ -145,7 +147,7 @@ class PGoApiRequest:
         request = RpcApi(auth_provider, parent.state)
         while True:
             try:
-                response = await request.request(parent.api_endpoint, self._req_method_list, position, parent.device_info, parent._proxy, parent.proxy_auth)
+                response = await request.request(parent.api_endpoint, self._req_method_list, self._req_platform_list, position, parent.device_info, parent._proxy, parent.proxy_auth)
                 break
             except AuthTokenExpiredException:
                 self.log.info('Access token rejected! Requesting new one...')
@@ -170,13 +172,20 @@ class PGoApiRequest:
             self.log.debug('Creating a new request...')
 
             try:
-                if kwargs:
-                    self._req_method_list.append(
-                        (RequestType.Value(func), kwargs))
-                    self.log.debug("Arguments of '%s': \n\r%s", func, kwargs)
-                else:
-                    self._req_method_list.append(RequestType.Value(func))
-                    self.log.debug("Adding '%s' to RPC request", func)
+                if func in RequestType.keys():
+                    if kwargs:
+                        self._req_method_list.append((RequestType.Value(func), kwargs))
+                        self.log.debug("Arguments of '%s': \n\r%s", func, kwargs)
+                    else:
+                        self._req_method_list.append(RequestType.Value(func))
+                        self.log.debug("Adding '%s' to RPC request", func)
+                elif func in PlatformRequestType.keys():
+                    if kwargs:
+                        self._req_platform_list.append((PlatformRequestType.Value(func), kwargs))
+                        self.log.debug("Arguments of '%s': \n\r%s", func, kwargs)
+                    else:
+                        self._req_platform_list.append(PlatformRequestType.Value(func))
+                        self.log.debug("Adding '%s' to RPC request", func)
             except ValueError:
                 raise AttributeError('{} not known.'.format(func))
 
