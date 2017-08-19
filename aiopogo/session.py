@@ -30,9 +30,9 @@ class SessionManager:
             session = ClientSession(connector=self.get_connector(socks),
                                     loop=self.loop,
                                     headers=(
-                                        ('Content-Type', 'application/x-www-form-urlencoded'),
+                                        ('Content-Type', 'application/binary'),
                                         ('User-Agent', 'Niantic App'),
-                                        ('Accept-Language', 'en-us')),
+                                        ('Accept-Encoding', 'identity, gzip')),
                                     request_class=ProxyClientRequest if socks else ClientRequest,
                                     raise_for_status=True,
                                     conn_timeout=10.0)
