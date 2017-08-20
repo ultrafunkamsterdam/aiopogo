@@ -41,7 +41,7 @@ class Auth:
         return new_ticket_time_ms > self._ticket_expire
 
     def check_ticket(self):
-        if get_time_ms() < (self._ticket_expire - 10000):
+        if get_time_ms() < (self._ticket_expire + 10000):
             return True
         self.log.debug(
             'Removed expired Session Ticket (%s)', self._ticket_expire)
