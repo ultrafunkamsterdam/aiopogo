@@ -21,6 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n@pogoprotos/networking/platform/requests/plat_eight_request.proto\x12\'pogoprotos.networking.platform.requests\"\"\n\x10PlatEightRequest\x12\x0e\n\x06\x66ield1\x18\x01 \x01(\tb\x06proto3')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -56,7 +57,6 @@ _PLATEIGHTREQUEST = _descriptor.Descriptor(
 )
 
 DESCRIPTOR.message_types_by_name['PlatEightRequest'] = _PLATEIGHTREQUEST
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 PlatEightRequest = _reflection.GeneratedProtocolMessageType('PlatEightRequest', (_message.Message,), dict(
   DESCRIPTOR = _PLATEIGHTREQUEST,

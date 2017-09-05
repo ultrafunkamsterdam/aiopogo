@@ -220,7 +220,7 @@ class RpcApi:
         sen.gravity_z = triangular(-1, 1, -.4)
         sen.status = 3
 
-        sig.version_hash = 0x4AE22D4661C83701
+        sig.version_hash = -960786418476827155
 
         try:
             for key, value in device_info.items():

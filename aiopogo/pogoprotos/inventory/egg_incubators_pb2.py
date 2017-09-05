@@ -23,6 +23,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   serialized_pb=_b('\n)pogoprotos/inventory/egg_incubators.proto\x12\x14pogoprotos.inventory\x1a(pogoprotos/inventory/egg_incubator.proto\"J\n\rEggIncubators\x12\x39\n\regg_incubator\x18\x01 \x03(\x0b\x32\".pogoprotos.inventory.EggIncubatorb\x06proto3')
   ,
   dependencies=[pogoprotos_dot_inventory_dot_egg__incubator__pb2.DESCRIPTOR,])
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -59,7 +60,6 @@ _EGGINCUBATORS = _descriptor.Descriptor(
 
 _EGGINCUBATORS.fields_by_name['egg_incubator'].message_type = pogoprotos_dot_inventory_dot_egg__incubator__pb2._EGGINCUBATOR
 DESCRIPTOR.message_types_by_name['EggIncubators'] = _EGGINCUBATORS
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 EggIncubators = _reflection.GeneratedProtocolMessageType('EggIncubators', (_message.Message,), dict(
   DESCRIPTOR = _EGGINCUBATORS,

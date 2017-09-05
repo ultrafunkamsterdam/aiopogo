@@ -21,6 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\nEpogoprotos/networking/requests/messages/list_gym_badges_message.proto\x12\'pogoprotos.networking.requests.messages\"\x16\n\x14ListGymBadgesMessageb\x06proto3')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -49,7 +50,6 @@ _LISTGYMBADGESMESSAGE = _descriptor.Descriptor(
 )
 
 DESCRIPTOR.message_types_by_name['ListGymBadgesMessage'] = _LISTGYMBADGESMESSAGE
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 ListGymBadgesMessage = _reflection.GeneratedProtocolMessageType('ListGymBadgesMessage', (_message.Message,), dict(
   DESCRIPTOR = _LISTGYMBADGESMESSAGE,

@@ -22,6 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n-pogoprotos/inventory/egg_incubator_type.proto\x12\x14pogoprotos.inventory*?\n\x10\x45ggIncubatorType\x12\x13\n\x0fINCUBATOR_UNSET\x10\x00\x12\x16\n\x12INCUBATOR_DISTANCE\x10\x01\x62\x06proto3')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _EGGINCUBATORTYPE = _descriptor.EnumDescriptor(
   name='EggIncubatorType',
@@ -51,7 +52,6 @@ INCUBATOR_DISTANCE = 1
 
 
 DESCRIPTOR.enum_types_by_name['EggIncubatorType'] = _EGGINCUBATORTYPE
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 # @@protoc_insertion_point(module_scope)

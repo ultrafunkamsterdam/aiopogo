@@ -21,6 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\nIpogoprotos/networking/requests/messages/collect_daily_bonus_message.proto\x12\'pogoprotos.networking.requests.messages\"\x1a\n\x18\x43ollectDailyBonusMessageb\x06proto3')
 )
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -49,7 +50,6 @@ _COLLECTDAILYBONUSMESSAGE = _descriptor.Descriptor(
 )
 
 DESCRIPTOR.message_types_by_name['CollectDailyBonusMessage'] = _COLLECTDAILYBONUSMESSAGE
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 CollectDailyBonusMessage = _reflection.GeneratedProtocolMessageType('CollectDailyBonusMessage', (_message.Message,), dict(
   DESCRIPTOR = _COLLECTDAILYBONUSMESSAGE,
