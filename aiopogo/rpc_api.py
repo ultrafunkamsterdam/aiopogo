@@ -220,7 +220,7 @@ class RpcApi:
         sen.gravity_z = triangular(-1, 1, -.4)
         sen.status = 3
 
-        sig.version_hash = -960786418476827155
+        sig.version_hash = -6553495230586135539
 
         try:
             for key, value in device_info.items():
@@ -415,6 +415,29 @@ class RpcApi:
             message = class_()
             message.ParseFromString(subresponse)
             responses[entry_name] = message
+
+        for i, subresponse in enumerate(response_proto.platform_returns):
+            request_entry = subresponse.type
+
+            entry_name = PlatformRequestType.Name(
+                request_entry if isinstance(
+                    request_entry, int) else request_entry[0])
+            proto_name = entry_name.lower() + '_response'
+
+            try:
+                class_ = globals()[proto_name]
+            except KeyError:
+                globals()[proto_name] = class_ = getattr(
+                    import_module(
+                        'pogoprotos.networking.platform.responses.' +
+                        proto_name +
+                        '_pb2'),
+                    to_camel_case(proto_name))
+
+            message = class_()
+            message.ParseFromString(subresponse.response)
+            responses[entry_name] = message
+
         return responses
 
 
