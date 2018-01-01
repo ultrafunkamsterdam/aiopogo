@@ -359,20 +359,19 @@ class RpcApi:
             'Protobuf structure of rpc response:\n\r%s',
             response_proto)
 
-        if response_proto.HasField('auth_ticket'):
-            self._auth_provider.set_ticket(response_proto.auth_ticket)
-
-        if not self.state.message8:
-            for plat_response in response_proto.platform_returns:
-                if plat_response.type == 8:
-                    resp = PlatEightResponse()
-                    resp.ParseFromString(plat_response.response)
-                    self.state.message8 = resp.message
-                    break
-
         # some response validations
         status_code = response_proto.status_code
         if status_code in (1, 2):
+            if response_proto.HasField('auth_ticket'):
+                self._auth_provider.set_ticket(response_proto.auth_ticket)
+
+            if not self.state.message8:
+                for plat_response in response_proto.platform_returns:
+                    if plat_response.type == 8:
+                        resp = PlatEightResponse()
+                        resp.ParseFromString(plat_response.response)
+                        self.state.message8 = resp.message
+                        break
             return self._parse_sub_responses(subrequests, subplatforms, response_proto)
         elif status_code == 53:
             raise ServerApiEndpointRedirectException(response_proto.api_url)
